@@ -35,13 +35,47 @@ h1{font-family:"Silkscreen",ui-monospace,monospace;font-weight:400;font-size:cla
 .screen{background:#000;padding:6px;line-height:0}
 canvas{display:block;width:100%;height:auto;aspect-ratio:320/200;image-rendering:pixelated;image-rendering:crisp-edges;outline:none}
 canvas:focus-visible{box-shadow:0 0 0 3px var(--key)}
-.pad{display:flex;justify-content:space-between;gap:16px;margin-top:14px;user-select:none;-webkit-user-select:none}
-.pad .cross{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(2,52px);gap:6px}
-.pad .acts{display:flex;gap:10px;align-items:center}
-.pad button{font-family:"Silkscreen",ui-monospace,monospace;font-size:13px;background:var(--btn);color:var(--btn-text);border:2px solid var(--line);border-radius:0;touch-action:none;min-width:52px;min-height:52px;padding:0 10px}
-.pad button:active,.pad button.on{background:var(--key);color:var(--panel)}
-.pad .acts button{min-width:80px;min-height:64px}
-@media (hover:hover) and (pointer:fine){.pad{display:none}}
+/* Kosketusohjaimet: näkyvät vain kosketuslaitteilla (html.touch). Tietokoneella mikään alla oleva ei ole käytössä. */
+.pad,.rotate-hint,.fs-btn,.pause-btn,.stances{display:none}
+.pad button,.fs-btn,.pause-btn{font-family:"Silkscreen",ui-monospace,monospace;font-size:13px;background:var(--btn);color:var(--btn-text);border:2px solid var(--line);border-radius:0;touch-action:none;min-width:52px;min-height:52px;padding:0 10px}
+.pad button:active,.pad button.on,.pad button.sel{background:var(--key);color:var(--panel)}
+html.touch{touch-action:manipulation}
+html.touch canvas:focus-visible{box-shadow:none}
+html.touch body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+html.touch .pad,html.touch canvas,html.touch .pause-btn{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+html.touch .pad{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:14px}
+.stick{position:relative;flex:none;width:150px;height:150px;border-radius:50%;background:var(--btn);border:2px solid var(--line);touch-action:none}
+.stick .ar{position:absolute;font-family:"Silkscreen",ui-monospace,monospace;font-size:18px;line-height:1;color:var(--btn-text)}
+.stick .ar.on{color:var(--key)}
+.stick .u{top:12px;left:50%;transform:translateX(-50%)}
+.stick .d{bottom:12px;left:50%;transform:translateX(-50%)}
+.stick .l{left:14px;top:50%;transform:translateY(-50%)}
+.stick .r{right:14px;top:50%;transform:translateY(-50%)}
+.pad .acts{display:flex;gap:10px;align-items:flex-end}
+.pad .act,.pad .jump{min-width:84px;min-height:68px}
+html.touch .pad.fighting .stances{display:flex;flex-direction:column;gap:6px}
+.pad .stances button{min-width:68px;min-height:42px}
+@media (orientation:portrait){
+  html.touch .rotate-hint{display:block;margin:12px 0 0;color:var(--muted);font-size:15px}
+  html.touch.can-fs .fs-btn{display:inline-block;margin-top:10px}
+}
+@media (orientation:landscape){
+  html.touch body{overflow:hidden}
+  html.touch .screen{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:0;background:#000}
+  html.touch canvas{height:auto;width:min(160dvh,calc(100vw - 340px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)))}
+  html.touch .stick{width:140px;height:140px}
+  html.touch .pad .acts{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;width:150px}
+  html.touch .pad .stances{grid-column:1/-1;flex-direction:row!important;gap:6px}
+  html.touch .pad .stances button{flex:1;min-width:0;min-height:40px;padding:0;font-size:11px}
+  html.touch .pad .act,html.touch .pad .jump{grid-column:span 3;min-width:0;min-height:64px;padding:0;font-size:12px}
+  html.touch .pad{position:fixed;left:0;right:0;bottom:0;z-index:11;margin:0;pointer-events:none;
+    padding:0 calc(env(safe-area-inset-right,0px) + 14px) calc(env(safe-area-inset-bottom,0px) + 12px) calc(env(safe-area-inset-left,0px) + 14px)}
+  html.touch .pad>*{pointer-events:auto}
+  html.touch .stick,html.touch .pad button{opacity:.62}
+  html.touch .pad button.on,html.touch .pad button.sel{opacity:.95}
+  html.touch .pause-btn{display:block;position:fixed;z-index:12;opacity:.62;line-height:1;min-width:44px;min-height:44px;
+    top:calc(env(safe-area-inset-top,0px) + 10px);left:calc(env(safe-area-inset-left,0px) + 14px)}
+}
 .help{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 40px;margin-top:26px}
 .help h2{font-family:"Silkscreen",ui-monospace,monospace;font-weight:400;font-size:18px;margin:0 0 8px}
 .help dl{margin:0;display:grid;grid-template-columns:max-content 1fr;gap:4px 14px}
@@ -61,15 +95,17 @@ kbd{font-family:inherit}
   <div class="screen"><canvas id="game" width="320" height="200" tabindex="0" aria-label="El Halcón -peli. Aloita välilyönnillä."></canvas></div>
 
   <div class="pad" aria-label="Kosketusohjaimet">
-    <div class="cross">
-      <span></span><button data-k="up" aria-label="Ylös">▲</button><span></span>
-      <button data-k="left" aria-label="Vasemmalle">◀</button><button data-k="down" aria-label="Alas">▼</button><button data-k="right" aria-label="Oikealle">▶</button>
-    </div>
+    <div class="stick" role="group" aria-label="Suuntaohjain"><span class="ar u">▲</span><span class="ar l">◀</span><span class="ar r">▶</span><span class="ar d">▼</span></div>
     <div class="acts">
-      <button data-k="act">Toimi</button>
-      <button data-k="jump">Hyppy</button>
+      <div class="stances" aria-label="Miekan korkeus"><button type="button" data-st="0">Ylä</button><button type="button" data-st="1">Keski</button><button type="button" data-st="2">Ala</button></div>
+      <button type="button" class="act" data-k="act">Toimi</button>
+      <button type="button" class="jump" data-k="jump">Hyppy</button>
     </div>
   </div>
+  <button class="pause-btn" type="button" aria-label="Tauko">II</button>
+  <p class="rotate-hint">Käännä puhelin vaakatasoon, niin peli täyttää näytön.</p>
+  <button class="fs-btn" type="button">Pelaa koko näytöllä</button>
+
 
   <section class="help">
     <div>
@@ -97,6 +133,9 @@ kbd{font-family:inherit}
 const C={black:'#000000',white:'#FFFFFF',red:'#68372B',cyan:'#70A4B2',purple:'#6F3D86',green:'#588D43',blue:'#352879',yellow:'#B8C76F',orange:'#6F4F25',brown:'#433900',lred:'#9A6759',dgrey:'#444444',grey:'#6C6C6C',lgreen:'#9AD284',lblue:'#6C5EB5',lgrey:'#959595'};
 const W=320,PLAY=176,PW=10;
 const cv=document.getElementById('game'),ctx=cv.getContext('2d');
+const TOUCH=!matchMedia('(hover:hover) and (pointer:fine)').matches;
+if(TOUCH){const h=document.documentElement;h.classList.add('touch');if(document.fullscreenEnabled||document.webkitFullscreenEnabled)h.classList.add('can-fs');}
+function vib(p){if(TOUCH&&navigator.vibrate){try{navigator.vibrate(p);}catch(e){}}}
 ctx.imageSmoothingEnabled=false;
 
 /* ---------------- world ---------------- */
@@ -176,7 +215,9 @@ function tone(f1,f2,dur,type='square',vol=.08,delay=0){
  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
  o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+dur+.02);
 }
+const VIB={hurt:[40,30,70],clang:15,hit:25,puzzle:[20,40,20],boing:8};
 function sfx(n){
+ if(VIB[n])vib(VIB[n]);
  switch(n){
   case'jump':tone(260,520,.12);break;
   case'boing':tone(180,760,.28,'triangle',.12);break;
@@ -208,13 +249,55 @@ window.addEventListener('keydown',e=>{
 });
 window.addEventListener('keyup',e=>{const k=KEYMAP[e.code]; if(k){e.preventDefault();up(k);}});
 window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false; if(G.mode==='play')G.paused=true;});
-document.querySelectorAll('.pad button').forEach(b=>{
+const padEl=document.querySelector('.pad'),actBtn=padEl.querySelector('.act'),stanceBtns=[...padEl.querySelectorAll('[data-st]')];
+padEl.querySelectorAll('button[data-k]').forEach(b=>{
  const k=b.dataset.k;
- b.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();b.setPointerCapture?.(e.pointerId);b.classList.add('on');down(k);});
+ b.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();try{b.setPointerCapture(e.pointerId);}catch(_){}b.classList.add('on');down(k);});
  const rel=()=>{b.classList.remove('on');up(k);};
  b.addEventListener('pointerup',rel);b.addEventListener('pointercancel',rel);b.addEventListener('lostpointercapture',rel);
- b.addEventListener('contextmenu',e=>e.preventDefault());
 });
+stanceBtns.forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();if(G.mode==='play'&&G.combat)G.stance=+b.dataset.st;}));
+padEl.addEventListener('contextmenu',e=>e.preventDefault());
+// Suuntaohjain: sormen voi liu'uttaa suunnasta toiseen nostamatta
+const stick=padEl.querySelector('.stick'),arr={left:stick.querySelector('.l'),right:stick.querySelector('.r'),up:stick.querySelector('.u'),down:stick.querySelector('.d')};
+let stickId=null;
+function setDir(h,v){
+ const want={left:h<0,right:h>0,up:v<0,down:v>0};
+ for(const k in want){if(want[k]){if(!keys[k])down(k);}else if(keys[k])up(k);arr[k].classList.toggle('on',want[k]);}
+}
+function stickMove(e){
+ const r=stick.getBoundingClientRect(),dx=(e.clientX-r.left-r.width/2)/(r.width/2),dy=(e.clientY-r.top-r.height/2)/(r.height/2);
+ const h=Math.abs(dx)>.25?Math.sign(dx):0,v=(Math.abs(dy)>.45&&Math.abs(dy)>Math.abs(dx)*.7)?Math.sign(dy):0;
+ setDir(h,v);
+}
+stick.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();stickId=e.pointerId;try{stick.setPointerCapture(e.pointerId);}catch(_){}stickMove(e);});
+stick.addEventListener('pointermove',e=>{if(e.pointerId===stickId)stickMove(e);});
+const stickEnd=e=>{if(e.pointerId!==stickId)return;stickId=null;setDir(0,0);};
+stick.addEventListener('pointerup',stickEnd);stick.addEventListener('pointercancel',stickEnd);stick.addEventListener('lostpointercapture',stickEnd);
+document.querySelector('.pause-btn').addEventListener('pointerdown',e=>{e.preventDefault();if(G.mode==='play')G.paused=!G.paused;});
+document.querySelector('.fs-btn').addEventListener('click',async()=>{
+ audioInit();const el=document.documentElement;
+ try{if(el.requestFullscreen)await el.requestFullscreen({navigationUI:'hide'});else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
+  if(screen.orientation&&screen.orientation.lock)await screen.orientation.lock('landscape');}catch(e){}
+});
+if(TOUCH)cv.addEventListener('contextmenu',e=>e.preventDefault());
+// Toimintonapin teksti ja miekkailunapit tilanteen mukaan (vain kosketuslaitteilla)
+let uiKey='';
+function syncUI(){
+ if(!TOUCH)return;
+ let label='Toimi',fight=false;
+ if(G.mode!=='play')label='Aloita';
+ else if(G.paused)label='Jatka';
+ else if(G.combat){label='Pistä';fight=true;}
+ else if(G.onGround&&!G.climbing){
+  const cx=G.px+5,near=items.some(i=>i.s===G.scr&&i.t!=='coin'&&i.y===G.py&&Math.abs(i.x-cx)<11);
+  if(near)label=G.held?'Vaihda':'Ota';else if(G.held)label='Laske';
+ }
+ const st=fight?G.stance:-1,k=label+'|'+st;
+ if(k===uiKey)return;uiKey=k;
+ actBtn.textContent=label;padEl.classList.toggle('fighting',fight);
+ stanceBtns.forEach((b,i)=>b.classList.toggle('sel',i===st));
+}
 cv.addEventListener('pointerdown',()=>{audioInit();cv.focus(); if(G.mode!=='play'){pressed.act=true;} else if(G.paused){G.paused=false;}});
 
 /* ---------------- helpers ---------------- */
@@ -668,7 +751,8 @@ function drawTitle(){
 /* ---------------- loop ---------------- */
 function step(){
  if(G.mode==='play'){
-  if(!G.paused)update();
+  if(TOUCH&&G.paused&&pressed.act){G.paused=false;}
+  else if(!G.paused)update();
  }else{
   if(pressed.jump||pressed.act){initGame();}
   if(G.mode!=='title')G.frames++;
@@ -679,7 +763,7 @@ let last=performance.now(),acc=0;const DT=1000/60;
 function frame(now){
  acc+=Math.min(100,now-last);last=now;
  while(acc>=DT){step();acc-=DT;}
- render();requestAnimationFrame(frame);
+ render();syncUI();requestAnimationFrame(frame);
 }
 if(document.fonts&&document.fonts.load){document.fonts.load('8px Silkscreen').catch(()=>{});}
 requestAnimationFrame(frame);

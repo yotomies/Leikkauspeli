@@ -44,6 +44,28 @@ kbd{font-family:inherit;font-size:11px;background:var(--keybg);border:1px solid 
 .acts{display:flex;flex-direction:column;gap:8px}
 .acts button{width:110px;height:52px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+body.touchmode{touch-action:none;overscroll-behavior:none}
+body.touchmode main{padding:0;gap:0}
+@media (orientation: portrait){ body.touchmode{align-items:flex-start} }
+.touch{display:none;position:fixed;inset:0;z-index:5;touch-action:none;-webkit-touch-callout:none}
+.touch.on{display:block}
+.stick{position:fixed;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.4);background:rgba(64,49,141,.28);pointer-events:none;opacity:.45;
+  left:calc(env(safe-area-inset-left,0px) + 96px);top:calc(100% - env(safe-area-inset-bottom,0px) - 96px)}
+.stick.active{opacity:1}
+.knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;
+  background:rgba(255,255,255,.45);border:2px solid rgba(255,255,255,.75)}
+.tb{position:fixed;border-radius:50%;font-family:inherit;font-size:13px;color:#fff;
+  background:rgba(64,49,141,.5);border:2px solid rgba(167,156,240,.85);touch-action:none;
+  -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+.tb.down{background:rgba(167,156,240,.9);color:#000}
+.laser{width:96px;height:96px;right:calc(env(safe-area-inset-right,0px) + 22px);bottom:calc(env(safe-area-inset-bottom,0px) + 26px)}
+.bomb{width:66px;height:66px;right:calc(env(safe-area-inset-right,0px) + 128px);bottom:calc(env(safe-area-inset-bottom,0px) + 100px)}
+.tools{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);right:calc(env(safe-area-inset-right,0px) + 8px);display:flex;gap:8px}
+.tools .tb{position:static;width:42px;height:42px;border-radius:8px;font-size:11px}
+.rotate{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);
+  font-size:10px;color:var(--muted);text-align:center;pointer-events:none;max-width:140px}
+@media (orientation: portrait){ .touch.on .rotate{display:block;bottom:auto;top:calc(env(safe-area-inset-top,0px) + 83.75vw + 24px)} .tools{top:calc(env(safe-area-inset-top,0px) + 83.75vw + 14px)} }
 @media (prefers-reduced-motion: reduce){ *{scroll-behavior:auto} }
 </style>
 </head>
@@ -51,17 +73,15 @@ kbd{font-family:inherit;font-size:11px;background:var(--keybg);border:1px solid 
 <main>
   <h1 class="sr">Syvä kuilu – pelastuslento</h1>
   <div class="screen"><canvas id="game" width="320" height="268" tabindex="0" aria-label="Pelialue. Aloita välilyönnillä."></canvas></div>
-  <div class="pad" id="pad" aria-label="Kosketusohjaimet">
-    <div class="dpad">
-      <button class="b-up" data-k="up" aria-label="Roottori ylös">▲</button>
-      <button class="b-left" data-k="left" aria-label="Vasemmalle">◀</button>
-      <button class="b-down" data-k="down" aria-label="Alas">▼</button>
-      <button class="b-right" data-k="right" aria-label="Oikealle">▶</button>
+  <div class="touch" id="touch" aria-label="Kosketusohjaimet">
+    <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
+    <button class="tb laser" data-k="fire" aria-label="Laser">Laser</button>
+    <button class="tb bomb" data-k="bomb" aria-label="Dynamiitti">Dyn.</button>
+    <div class="tools">
+      <button class="tb small" data-k="pause" aria-label="Tauko">II</button>
+      <button class="tb small" id="fsBtn" aria-label="Koko näyttö">[ ]</button>
     </div>
-    <div class="acts">
-      <button data-k="fire">Laser</button>
-      <button data-k="bomb">Dynamiitti</button>
-    </div>
+    <div class="rotate">Käännä puhelin vaakaan</div>
   </div>
   <p class="help" id="help">
     <kbd>←</kbd><kbd>→</kbd> liiku &nbsp; <kbd>↑</kbd> roottori &nbsp; <kbd>↓</kbd> laskeudu tai pudota dynamiitti maassa<br>
@@ -282,28 +302,74 @@ function pressed(k){ return keys[k] && !prev[k]; }
 let tap=false;
 cv.addEventListener('pointerdown',()=>{ initAudio(); tap=true; cv.focus(); });
 
-const pad=document.getElementById('pad');
-const coarse=window.matchMedia && matchMedia('(pointer: coarse)').matches;
-if(coarse){ pad.classList.add('on'); document.getElementById('help').style.display='none'; }
-pad.querySelectorAll('button').forEach(b=>{
-  const k=b.dataset.k;
-  const on=e=>{ e.preventDefault(); initAudio(); keys[k]=true; b.classList.add('down'); try{b.setPointerCapture(e.pointerId)}catch(_){} };
-  const off=e=>{ e.preventDefault(); keys[k]=false; b.classList.remove('down'); };
-  b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off);
-  b.addEventListener('pointercancel',off); b.addEventListener('lostpointercapture',off);
-  b.addEventListener('contextmenu',e=>e.preventDefault());
-});
+const coarse=!!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+const touchMode=coarse;
+function vibe(pat){ try{ if(navigator.vibrate) navigator.vibrate(pat); }catch(e){} }
+if(touchMode){
+  document.body.classList.add('touchmode');
+  document.getElementById('help').style.display='none';
+  const touchEl=document.getElementById('touch'), stick=document.getElementById('stick'), knob=document.getElementById('knob');
+  touchEl.classList.add('on');
+  touchEl.addEventListener('contextmenu',e=>e.preventDefault());
+  // buttons
+  touchEl.querySelectorAll('button[data-k]').forEach(b=>{
+    const k=b.dataset.k;
+    const on=e=>{ e.preventDefault(); initAudio(); keys[k]=true; b.classList.add('down'); try{b.setPointerCapture(e.pointerId)}catch(_){} };
+    const off=e=>{ keys[k]=false; b.classList.remove('down'); };
+    b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off);
+    b.addEventListener('pointercancel',off); b.addEventListener('lostpointercapture',off);
+  });
+  // floating joystick on the left half
+  let sid=null, ox=0, oy=0; const RAD=48;
+  const place=()=>{ stick.style.left=ox+'px'; stick.style.top=oy+'px'; };
+  const upd=(x,y)=>{
+    let dx=x-ox, dy=y-oy; const d=Math.hypot(dx,dy);
+    if(d>RAD){ ox+=dx*(1-RAD/d); oy+=dy*(1-RAD/d); place(); dx=x-ox; dy=y-oy; }
+    knob.style.transform='translate('+dx+'px,'+dy+'px)';
+    keys.left=dx<-14; keys.right=dx>14; keys.up=dy<-16; keys.down=dy>24;
+  };
+  touchEl.addEventListener('pointerdown',e=>{
+    initAudio();
+    if(e.target.closest('button')) { tap=true; return; }
+    e.preventDefault();
+    if(e.clientX<innerWidth*0.5 && sid===null){
+      sid=e.pointerId; ox=e.clientX; oy=e.clientY; place(); stick.classList.add('active');
+      try{touchEl.setPointerCapture(e.pointerId)}catch(_){}
+      upd(e.clientX,e.clientY);
+    } else tap=true;
+  });
+  touchEl.addEventListener('pointermove',e=>{ if(e.pointerId===sid) upd(e.clientX,e.clientY); });
+  const end=e=>{ if(e.pointerId!==sid) return; sid=null; keys.left=keys.right=keys.up=keys.down=false;
+    stick.classList.remove('active'); stick.style.left=''; stick.style.top=''; knob.style.transform=''; };
+  touchEl.addEventListener('pointerup',end); touchEl.addEventListener('pointercancel',end);
+  // fullscreen + landscape lock where supported
+  const fsBtn=document.getElementById('fsBtn'), D=document;
+  if(!(D.fullscreenEnabled||D.webkitFullscreenEnabled)) fsBtn.style.display='none';
+  fsBtn.addEventListener('click',()=>{
+    try{
+      if(!(D.fullscreenElement||D.webkitFullscreenElement)){
+        const el=D.documentElement, req=el.requestFullscreen||el.webkitRequestFullscreen;
+        if(req) Promise.resolve(req.call(el)).then(()=>{ try{ screen.orientation.lock('landscape').catch(()=>{}); }catch(_){} }).catch(()=>{});
+      } else { const ex=D.exitFullscreen||D.webkitExitFullscreen; if(ex) ex.call(D); }
+    }catch(_){}
+  });
+  addEventListener('fullscreenchange',()=>setTimeout(fit,100));
+}
 
 // ---------- scaling ----------
 function fit(){
-  const padH = pad.classList.contains('on') ? pad.offsetHeight+14 : 0;
+  if(touchMode){
+    const s=Math.min(window.innerWidth/VW, window.innerHeight/(VH+HUD));
+    cv.style.width=Math.floor(VW*s)+'px'; cv.style.height=Math.floor((VH+HUD)*s)+'px'; return;
+  }
   const helpEl=document.getElementById('help');
   const helpH = helpEl.style.display==='none' ? 0 : helpEl.offsetHeight+14;
-  const aw=window.innerWidth-36, ah=window.innerHeight-padH-helpH-48;
+  const aw=window.innerWidth-36, ah=window.innerHeight-helpH-48;
   let s=Math.min(aw/VW, ah/(VH+HUD));
   s = s>=2 ? Math.floor(s) : Math.max(0.8,s);
   cv.style.width=Math.round(VW*s)+'px'; cv.style.height=Math.round((VH+HUD)*s)+'px';
 }
+addEventListener('orientationchange',()=>setTimeout(fit,200));
 addEventListener('resize',fit); fit();
 
 // ---------- world ----------
@@ -501,7 +567,7 @@ function killEnemy(e){ e.alive=false; addScore(50); popups.push({x:e.x+e.w/2+14,
 
 function die(){
   if(state!=='play') return;
-  state='dying'; timer=80; laser=null;
+  state='dying'; timer=80; laser=null; vibe([40,30,60,30,220]);
   burst(player.x+5,player.y+7,24,[C.yellow,C.cyan,C.white,C.lred],3);
   beep(600,0.7,'sawtooth',0.06,-560);
 }
@@ -513,7 +579,7 @@ function explode(d){
   enemies.forEach(e=>{ if(e.alive && Math.hypot(e.x+e.w/2-cx,e.y+e.h/2-cy)<40) killEnemy(e); });
   const pdx=Math.abs(player.x+5-cx), pdy=Math.abs(player.y+7-cy);
   if(state==='play' && pdx<30 && pdy<26) die();
-  flash=12; noise(0.6,0.35); beep(80,0.5,'square',0.08,-50);
+  flash=12; if(state==='play') vibe(pdx<90&&pdy<70?[90,30,140]:60); noise(0.6,0.35); beep(80,0.5,'square',0.08,-50);
   burst(cx,cy,30,[C.yellow,C.white,C.lred,C.orange],3.5);
 }
 
@@ -574,7 +640,7 @@ function update(){
   if(!p.ground){ const probe={x:p.x,y:p.y+0.5,w:p.w,h:p.h}; if(collides(probe)) p.ground=true; }
 
   // dynamite
-  if((pressed('bomb')||(pressed('down')&&p.ground)) && !dyn && bombs>0){
+  if((pressed('bomb')||(pressed('down')&&p.ground&&!touchMode)) && !dyn && bombs>0){
     bombs--; dyn={x:p.x+p.w/2-2+(p.face>0?2:-2),y:p.y+p.h-10,w:4,h:10,vy:0,t:100,ground:false};
     beep(900,0.05,'square',0.04);
   }
@@ -717,7 +783,7 @@ function drawTitle(){
   const hy=70+Math.sin(frame*0.06)*6; drawHero(VW/2-5,hy,1,frame*0.8,false);
   const lines=['Kaivosmiehet jäivät loukkuun.','25 tasoa. Lennä alas, raivaa seinät','ja pelasta joka tasolta yksi mies.'];
   lines.forEach((l,i)=>txt(l,VW/2,100+i*12,C.white,8,'center'));
-  if(frame%60<40) txt(coarse?'Napauta aloittaaksesi':'Paina välilyöntiä',VW/2,138,C.yellow,8,'center',true);
+  if(frame%60<40) txt(coarse?'Napauta oikealta aloittaaksesi':'Paina välilyöntiä',VW/2,138,C.yellow,8,'center',true);
   if(unlocked>0) txt('< Aloitustaso '+(startSel+1)+' / '+LEVELS.length+' >',VW/2,152,C.cyan,8,'center');
   R(0,VH,VW,62,'#6C6C6C'); R(0,VH+62,VW,HUD-62,'#000');
   txt('Ennätys',VW/2,VH+12,C.white,8,'center',true);

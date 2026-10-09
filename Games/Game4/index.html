@@ -76,12 +76,35 @@ tr.me td{color:var(--orange);font-weight:700}
   font-size:12.5px;color:var(--muted);margin-top:10px}
 #help kbd{background:var(--ink);color:var(--page);border:0}
 #muteBtn{font-size:8px;padding:7px 9px}
-#touch{position:absolute;left:0;right:0;bottom:0;display:none;justify-content:space-between;align-items:flex-end;padding:8px;pointer-events:none;z-index:2}
-#touch.on{display:flex}
-#touch .grp{display:flex;gap:8px;pointer-events:auto;align-items:flex-end}
-#touch .col{flex-direction:column;align-items:flex-end}
-#touch button{width:58px;height:58px;border-radius:50%;opacity:.5;font-size:8px;padding:0;touch-action:none;-webkit-user-select:none;user-select:none}
-#touch button.sm{width:46px;height:46px;font-size:7px}
+#touch{position:absolute;inset:0;display:none;pointer-events:none;z-index:2}
+#touch.on{display:block}
+#stickZone{position:absolute;left:0;top:0;bottom:0;width:55%;pointer-events:auto;touch-action:none}
+#stickBase{position:absolute;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;border:2px solid rgba(255,255,255,.55);background:rgba(0,26,68,.3);display:none;pointer-events:none}
+#stickKnob{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(255,255,255,.6);border:2px solid #000}
+#stickHint{position:absolute;left:4%;bottom:6%;font:8px "Press Start 2P",monospace;color:rgba(255,255,255,.55);pointer-events:none;text-shadow:1px 1px 0 #000}
+#tbtns{position:absolute;right:max(10px,env(safe-area-inset-right,0px));bottom:10px;display:grid;grid-template-columns:repeat(2,auto);gap:10px;pointer-events:auto;align-items:end}
+#tbtns button,#pauseBtn{border-radius:50%;padding:0;opacity:.6;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#tbtns button{width:64px;height:64px;font-size:8px}
+#tbtns button.big{width:78px;height:78px;font-size:9px;background:var(--orange)}
+#tbtns button.on{opacity:.95;background:var(--orange)}
+#pauseBtn{position:absolute;left:72%;top:1.5%;width:44px;height:44px;font-size:10px;pointer-events:auto}
+.touchonly{display:none}
+#rotate{display:none}
+@media (pointer:coarse){
+  body{padding:0;min-height:100vh;min-height:100dvh;justify-content:center;background:#000}
+  #stage{width:min(100vw, calc(100vh * 1.6));width:min(100vw, calc(100dvh * 1.6));border:0;box-shadow:none}
+  #help,.kbonly{display:none!important}
+  .touchonly{display:block}
+  h1{font-size:clamp(16px,4vw,28px)}
+  .panel{padding:10px 12px}
+  .copper{height:26px;margin:-10px -12px 8px}
+}
+@media (pointer:coarse) and (orientation:portrait){
+  #rotate{display:flex;position:fixed;inset:0;z-index:50;background:#001a44;color:#fff;align-items:center;justify-content:center;flex-direction:column;gap:18px;text-align:center;padding:24px;font:12px/1.8 "Press Start 2P",monospace}
+  #rotate .ph{width:46px;height:80px;border:4px solid #fff;border-radius:8px;animation:rot 2s ease-in-out infinite}
+  @keyframes rot{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+}
+@media (prefers-reduced-motion:reduce){#rotate .ph{animation:none;transform:rotate(-90deg)}}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 </style>
 </head>
@@ -90,13 +113,17 @@ tr.me td{color:var(--orange);font-weight:700}
   <canvas id="game" width="640" height="400" aria-label="Pelialue"></canvas>
   <div id="ov" class="ov hidden"></div>
   <div id="touch" aria-hidden="true">
-    <div class="grp"><button data-k="ArrowLeft">◀</button><button data-k="ArrowRight">▶</button></div>
-    <div class="grp col">
-      <div class="grp"><button class="sm" data-k="KeyZ">ETU</button><button class="sm" data-k="KeyX">TAKA</button><button class="sm" data-k="KeyC">MIINA</button></div>
-      <div class="grp"><button data-k="ArrowDown">JARRU</button><button data-k="ArrowUp">KAASU</button></div>
+    <div id="stickZone"></div>
+    <div id="stickBase"><div id="stickKnob"></div></div>
+    <div id="stickHint">Ohjaa vetämällä</div>
+    <button id="pauseBtn" type="button">II</button>
+    <div id="tbtns">
+      <button data-w="rear">TAKA</button><button data-w="front" class="big">ETU</button>
+      <button data-w="mine">MIINA</button><button data-w="brake">JARRU</button>
     </div>
   </div>
 </div>
+<div id="rotate"><div class="ph"></div><div>Käännä puhelin vaakatasoon</div></div>
 <div id="help">
   <span>Yksinpeli: nuolet tai WASD, <kbd>Z</kbd> etuohjus, <kbd>X</kbd> takaohjus, <kbd>C</kbd> miina. <kbd>P</kbd> tauko, <kbd>M</kbd> ääni.</span>
   <button id="muteBtn" type="button">Ääni päällä</button>
@@ -182,7 +209,7 @@ const QUOTES=[
 ];
 
 /* ---------- state ---------- */
-const G={quick:false,mode:'menu',players:1,division:1,raceNo:0,humans:[],drivers:[],paused:false,quote:null,lastOrder:[],pendingPromote:false};
+const G={touch:false,quick:false,mode:'menu',players:1,division:1,raceNo:0,humans:[],drivers:[],paused:false,quote:null,lastOrder:[],pendingPromote:false};
 let R=null;
 const keys={};
 const NOINP={up:false,down:false,steer:0};
@@ -441,7 +468,23 @@ function makeCar(d,slot,T,demo){
 }
 const topSpeed=c=>(3.0+0.33*c.engine)*(1-c.damage/260)*((c.human&&!c.finished)?1:c.ai.skill);
 
+const TS={id:null,ox:0,oy:0,mag:0,ang:0,brake:false,front:false,rear:false,mine:false};
+const isTouch=()=>!!(window.matchMedia&&window.matchMedia('(pointer:coarse)').matches);
+function touchInput(c){
+ const fwd=c.vx*Math.cos(c.a)+c.vy*Math.sin(c.a);
+ let up=true,down=false,steer=0;
+ if(TS.id!=null&&TS.mag>0.25){
+  const diff=angN(TS.ang-c.a);
+  if(Math.abs(diff)>2.3){
+   up=false; down=true;
+   if(fwd<0.3)steer=-clamp(angN(TS.ang-(c.a+Math.PI))*2.5,-1,1);
+  } else steer=clamp(diff*2.5,-1,1);
+ }
+ if(TS.brake){up=false; down=true}
+ return {up,down,steer,front:TS.front,rear:TS.rear,mine:TS.mine};
+}
 function humInput(c){
+ if(G.touch&&c.hum===G.humans[0])return touchInput(c);
  const m=c.hum.map,k=a=>a.some(x=>keys[x]);
  return {up:k(m.up),down:k(m.down),steer:(k(m.right)?1:0)-(k(m.left)?1:0),front:k(m.front),rear:k(m.rear),mine:k(m.mine)};
 }
@@ -646,7 +689,7 @@ function newQuick(ti){
  startRace();
 }
 function startRace(){
- initAudio();
+ initAudio(); G.touch=isTouch()&&G.players===1; if(G.touch)goFull(); resetTouch();
  G.mode='race'; G.paused=false;
  createRace(TRACKS[G.raceNo%TRACKS.length],G.drivers,false);
  hideOv();
@@ -851,14 +894,14 @@ function hud(c,vx,vy,vw,vh,solo){
  txt(Math.max(1,Math.min(c.lap,R.laps))+'/'+R.laps,vx+86,vy+24,'#fff',10);
  txt(fmtTime(c.finished?c.finishTime:R.t),vx+12,vy+40,'#cfe0ff',7);
  if(!solo)txt(c.hum.name,vx+150,vy+40,c.color,7,'right');
- const by=vy+vh-30;
- box(vx+6,by,130,24);
- txt('NOP',vx+11,by+5,'#a9c4ea',6); bar(vx+34,by+4,96,6,Math.hypot(c.vx,c.vy)/4.6,'#55dd66');
- txt('VAU',vx+11,by+15,'#a9c4ea',6); bar(vx+34,by+14,96,6,c.damage/100,c.damage>66?'#ff4a4a':c.damage>33?'#ffb02e':'#ffe066');
- box(vx+140,by,150,24);
- drawIcon('front',vx+150,by+12); txt(String(c.front),vx+160,by+8,'#fff',8);
- drawIcon('rear',vx+198,by+12); txt(String(c.rear),vx+208,by+8,'#fff',8);
- drawIcon('mine',vx+246,by+12); txt(String(c.mines),vx+256,by+8,'#fff',8);
+ const tch=G.touch&&solo, by=tch?vy+6:vy+vh-30, sx=tch?vx+162:vx+6, ax=tch?vx+298:vx+140;
+ box(sx,by,130,24);
+ txt('NOP',sx+5,by+5,'#a9c4ea',6); bar(sx+28,by+4,96,6,Math.hypot(c.vx,c.vy)/4.6,'#55dd66');
+ txt('VAU',sx+5,by+15,'#a9c4ea',6); bar(sx+28,by+14,96,6,c.damage/100,c.damage>66?'#ff4a4a':c.damage>33?'#ffb02e':'#ffe066');
+ box(ax,by,150,24);
+ drawIcon('front',ax+10,by+12); txt(String(c.front),ax+20,by+8,'#fff',8);
+ drawIcon('rear',ax+58,by+12); txt(String(c.rear),ax+68,by+8,'#fff',8);
+ drawIcon('mine',ax+106,by+12); txt(String(c.mines),ax+116,by+8,'#fff',8);
  if(c.wreckT>0&&((R.frame>>4)&1))txt('ROMUTETTU!',vx+vw/2,vy+vh/2-28,'#ff4a4a',14,'center');
  if(c.finished)txt('MAALISSA - SIJA '+c.pos,vx+vw/2,vy+vh/2-34,'#ff8800',12,'center');
 }
@@ -934,6 +977,12 @@ function render(){
 }
 
 /* ---------- overlays ---------- */
+function goFull(){
+ const d=document.documentElement,f=d.requestFullscreen||d.webkitRequestFullscreen;
+ if(!f||document.fullscreenElement||document.webkitFullscreenElement)return;
+ try{const r=f.call(d,{navigationUI:'hide'}); const lock=()=>{try{const o=screen.orientation; if(o&&o.lock)o.lock('landscape').catch(()=>{})}catch(_){}};
+  if(r&&r.then)r.then(lock).catch(()=>{}); else lock();}catch(_){}
+}
 function setTouch(on){
  const coarse=window.matchMedia&&window.matchMedia('(pointer:coarse)').matches;
  touchEl.classList.toggle('on',!!(on&&coarse));
@@ -953,13 +1002,14 @@ function showMenu(){
  showOv(`<div class="panel"><div class="copper"></div>
  <h1>NASTA<br>LAUTAAN</h1>
  <p class="sub">Ylhäältä kuvattu taistelukilpa-ajo. Aja, ammu, osta parempaa peltiä ja varo junaa.</p>
- <div class="btns"><button data-act="new1">1 pelaaja</button><button data-act="new2">2 pelaajaa</button><button data-act="quickmenu">Pikakisa</button></div>
- <div class="keys">
+ <div class="btns"><button data-act="new1">1 pelaaja</button><button data-act="new2" class="kbonly">2 pelaajaa</button><button data-act="quickmenu">Pikakisa</button></div>
+ <div class="keys kbonly">
   <div><b>Yksinpeli</b><kbd>←</kbd><kbd>→</kbd> ohjaus, <kbd>↑</kbd> kaasu, <kbd>↓</kbd> jarru<br><kbd>Z</kbd> tai <kbd>välilyönti</kbd> etuohjus<br><kbd>X</kbd> takaohjus, <kbd>C</kbd> miina</div>
   <div><b>Pelaaja 1</b><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ajo<br><kbd>F</kbd> etuohjus, <kbd>G</kbd> takaohjus<br><kbd>H</kbd> miina</div>
   <div><b>Pelaaja 2</b>nuolinäppäimet ajo<br><kbd>,</kbd> etuohjus, <kbd>.</kbd> takaohjus<br><kbd>-</kbd> miina</div>
  </div>
- <p class="tiny">Kausi on ${SEASON} kisaa. Pisteet 10, 7, 5, 4, 3, 2 ja 1. Voita mestaruus, niin nouset kovempaan divisioonaan. <kbd>P</kbd> tauko, <kbd>M</kbd> ääni.</p>
+ <p class="touchonly sub" style="font-size:13px">Kaasu on päällä automaattisesti. Vedä peukaloa ruudun vasemmalla puolella siihen suuntaan, johon haluat ajaa. Vetämällä auton takasuuntaan jarrutat ja peruutat. Oikealla ovat aseet ja jarru, ylhäällä tauko.</p>
+ <p class="tiny">Kausi on ${SEASON} kisaa. Pisteet 10, 7, 5, 4, 3, 2 ja 1. Voita mestaruus, niin nouset kovempaan divisioonaan.<span class="kbonly"> <kbd>P</kbd> tauko, <kbd>M</kbd> ääni.</span></p>
  </div>`);
 }
 function standingsTable(){
@@ -1020,7 +1070,7 @@ function showShop(){
 }
 function showPause(){
  showOv(`<div class="panel" style="width:min(360px,100%);text-align:center"><h2>Tauko</h2>
- <div class="btns"><button data-act="resume">Jatka</button><button data-act="quit">Lopeta kausi</button></div>
+ <div class="btns"><button data-act="resume">Jatka</button><button data-act="mute">${AU.muted?'Ääni päälle':'Ääni pois'}</button><button data-act="quit">Lopeta</button></div>
  <p class="tiny">Lopettaminen palauttaa alkuvalikkoon. Kauden tilanne menetetään.</p></div>`);
 }
 ov.addEventListener('click',e=>{
@@ -1035,6 +1085,7 @@ ov.addEventListener('click',e=>{
  else if(a==='nextseason'){if(G.pendingPromote)G.division++; G.raceNo=0; G.quote=null; for(const d of G.drivers)d.points=0; showShop()}
  else if(a==='resume'){G.paused=false; hideOv()}
  else if(a==='quit')quitToMenu();
+ else if(a==='mute'){initAudio(); toggleMute(); showPause()}
  else if(a==='quickmenu')showQuick();
  else if(a==='menu')showMenu();
  else if(a==='quick')newQuick(+b.dataset.t);
@@ -1054,12 +1105,32 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{keys[e.code]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false; if(G.mode==='race'&&!G.paused&&R&&!R.done){G.paused=true; showPause()}});
-for(const b of touchEl.querySelectorAll('button[data-k]')){
- const k=b.dataset.k;
- b.addEventListener('pointerdown',e=>{e.preventDefault(); keys[k]=true; try{b.setPointerCapture(e.pointerId)}catch(_){}});
- for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>{keys[k]=false});
+const stickZone=document.getElementById('stickZone'),stickBase=document.getElementById('stickBase'),stickKnob=document.getElementById('stickKnob'),stickHint=document.getElementById('stickHint'),stageEl=document.getElementById('stage');
+function resetTouch(){TS.id=null; TS.mag=0; TS.brake=TS.front=TS.rear=TS.mine=false; stickBase.style.display='none'; for(const b of touchEl.querySelectorAll('[data-w]'))b.classList.remove('on')}
+stickZone.addEventListener('pointerdown',e=>{
+ if(TS.id!=null)return; e.preventDefault(); const r=stageEl.getBoundingClientRect();
+ TS.id=e.pointerId; TS.ox=e.clientX-r.left; TS.oy=e.clientY-r.top; TS.mag=0;
+ stickBase.style.left=TS.ox+'px'; stickBase.style.top=TS.oy+'px'; stickBase.style.display='block'; stickKnob.style.transform='';
+ stickHint.style.display='none';
+ try{stickZone.setPointerCapture(e.pointerId)}catch(_){}
+});
+stickZone.addEventListener('pointermove',e=>{
+ if(e.pointerId!==TS.id)return; const r=stageEl.getBoundingClientRect();
+ const dx=e.clientX-r.left-TS.ox,dy=e.clientY-r.top-TS.oy,len=Math.hypot(dx,dy),R0=50,k=len>R0?R0/len:1;
+ TS.mag=Math.min(1,len/R0); TS.ang=Math.atan2(dy,dx);
+ stickKnob.style.transform='translate('+(dx*k)+'px,'+(dy*k)+'px)';
+});
+for(const ev of ['pointerup','pointercancel','lostpointercapture'])stickZone.addEventListener(ev,e=>{if(e.pointerId!==TS.id)return; TS.id=null; TS.mag=0; stickBase.style.display='none'});
+for(const b of touchEl.querySelectorAll('[data-w]')){
+ const w=b.dataset.w;
+ b.addEventListener('pointerdown',e=>{e.preventDefault(); TS[w]=true; b.classList.add('on'); try{b.setPointerCapture(e.pointerId)}catch(_){}});
+ for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>{TS[w]=false; b.classList.remove('on')});
  b.addEventListener('contextmenu',e=>e.preventDefault());
 }
+document.getElementById('pauseBtn').addEventListener('click',()=>{if(G.mode==='race'&&!G.paused&&R&&!R.done){G.paused=true; resetTouch(); showPause()}});
+function checkPortrait(){if(isTouch()&&window.innerHeight>window.innerWidth&&G.mode==='race'&&!G.paused&&R&&!R.done){G.paused=true; resetTouch(); showPause()}}
+addEventListener('resize',checkPortrait);
+addEventListener('orientationchange',checkPortrait);
 muteBtn.addEventListener('click',()=>{initAudio(); toggleMute()});
 
 /* ---------- loop ---------- */
@@ -1073,7 +1144,7 @@ function frame(now){
 }
 startDemo(); showMenu();
 requestAnimationFrame(frame);
-window.__kp={G,get R(){return R},createRace,update,render,newGame,startRace,TRACKS,keys};
+window.__kp={TS,G,get R(){return R},createRace,update,render,newGame,startRace,TRACKS,keys};
 })();
 </script>
 </body>
