@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>El Halcón – tasohyppelyseikkailu C64-hengessä</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --frame:#A79DE6; --panel:#EDEAFB; --text:#2A1F6B; --muted:#4E4396; --key:#4F5C0F; --line:#B9B0EC; --btn:#D9D4F7; --btn-text:#2A1F6B;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --frame:#6C5EB5; --panel:#352879; --text:#CFC9F7; --muted:#A49BE6; --key:#D3E089; --line:#5A4CA8; --btn:#4A3C9A; --btn-text:#E4E0FB;
+  }
+}
+:root[data-theme="dark"]{
+  --frame:#6C5EB5; --panel:#352879; --text:#CFC9F7; --muted:#A49BE6; --key:#D3E089; --line:#5A4CA8; --btn:#4A3C9A; --btn-text:#E4E0FB;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--frame)}
+body{margin:0;background:var(--frame);color:var(--text);font-family:"Pixelify Sans",ui-monospace,"Courier New",monospace;font-size:17px;line-height:1.5}
+.frame{max-width:1000px;margin:clamp(10px,3vw,40px) auto;background:var(--panel);padding:clamp(14px,3vw,32px)}
+.boot{font-family:"Silkscreen",ui-monospace,monospace;font-size:13px;color:var(--muted);margin:0 0 18px;line-height:1.6}
+.caret{display:inline-block;width:.6em;height:1em;background:var(--muted);vertical-align:-2px;margin-left:4px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion: reduce){.caret{animation:none}}
+h1{font-family:"Silkscreen",ui-monospace,monospace;font-weight:400;font-size:clamp(34px,7vw,64px);line-height:1;margin:0 0 10px;letter-spacing:.02em;color:var(--text);text-shadow:4px 4px 0 var(--line)}
+.lede{margin:0 0 22px;max-width:62ch;color:var(--text)}
+.screen{background:#000;padding:6px;line-height:0}
+canvas{display:block;width:100%;height:auto;aspect-ratio:320/200;image-rendering:pixelated;image-rendering:crisp-edges;outline:none}
+canvas:focus-visible{box-shadow:0 0 0 3px var(--key)}
+.pad{display:flex;justify-content:space-between;gap:16px;margin-top:14px;user-select:none;-webkit-user-select:none}
+.pad .cross{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(2,52px);gap:6px}
+.pad .acts{display:flex;gap:10px;align-items:center}
+.pad button{font-family:"Silkscreen",ui-monospace,monospace;font-size:13px;background:var(--btn);color:var(--btn-text);border:2px solid var(--line);border-radius:0;touch-action:none;min-width:52px;min-height:52px;padding:0 10px}
+.pad button:active,.pad button.on{background:var(--key);color:var(--panel)}
+.pad .acts button{min-width:80px;min-height:64px}
+@media (hover:hover) and (pointer:fine){.pad{display:none}}
+.help{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 40px;margin-top:26px}
+.help h2{font-family:"Silkscreen",ui-monospace,monospace;font-weight:400;font-size:18px;margin:0 0 8px}
+.help dl{margin:0;display:grid;grid-template-columns:max-content 1fr;gap:4px 14px}
+.help dt{color:var(--key);font-weight:600}
+.help dd{margin:0}
+.help p{margin:0 0 10px;max-width:60ch}
+.note{margin:26px 0 0;font-size:14px;color:var(--muted);max-width:70ch}
+kbd{font-family:inherit}
+</style>
+</head>
+<body>
+<main class="frame">
+  <p class="boot">LOAD"EL HALCON",8,1<br>READY.<span class="caret" aria-hidden="true"></span></p>
+  <h1>El Halcón</h1>
+  <p class="lede">Kapteeni Vargas on siepannut Doña Luzin linnoitukseensa. Kulje kylän, kellarien ja kaivoksen läpi, ratkaise esinepulmat ja voita vartijat miekkailussa.</p>
+
+  <div class="screen"><canvas id="game" width="320" height="200" tabindex="0" aria-label="El Halcón -peli. Aloita välilyönnillä."></canvas></div>
+
+  <div class="pad" aria-label="Kosketusohjaimet">
+    <div class="cross">
+      <span></span><button data-k="up" aria-label="Ylös">▲</button><span></span>
+      <button data-k="left" aria-label="Vasemmalle">◀</button><button data-k="down" aria-label="Alas">▼</button><button data-k="right" aria-label="Oikealle">▶</button>
+    </div>
+    <div class="acts">
+      <button data-k="act">Toimi</button>
+      <button data-k="jump">Hyppy</button>
+    </div>
+  </div>
+
+  <section class="help">
+    <div>
+      <h2>Ohjaus</h2>
+      <dl>
+        <dt>◀ ▶ / A D</dt><dd>Kävele</dd>
+        <dt>▲ ▼ / W S</dt><dd>Kiipeä tikkaita, alas tasanteelta. Miekkaillessa miekan korkeus.</dd>
+        <dt>Välilyönti / X</dt><dd>Hyppää</dd>
+        <dt>Z / E / Enter</dt><dd>Ota tai laske esine. Miekkaillessa pisto.</dd>
+        <dt>P / M</dt><dd>Tauko / äänet</dd>
+      </dl>
+    </div>
+    <div>
+      <h2>Miekkailu</h2>
+      <p>Kun vartija on lähellä, miekka tulee esiin ja kädessä oleva esine putoaa. Poimi se taistelun jälkeen.</p>
+      <p>Pisto osuu, jos miekkasi on eri korkeudella kuin vartijan. Vartija seuraa liikettäsi pienellä viiveellä, joten vaihda korkeutta ja pistä heti.</p>
+      <p>Kun vartijan miekka välkkyy, hän valmistelee iskua. Torju asettamalla miekkasi samalle korkeudelle.</p>
+    </div>
+  </section>
+  <p class="note">Pelimekaniikat mukailevat Datasoftin Commodore 64 -peliä vuodelta 1985. Hahmot, nimet ja grafiikka on tehty tätä versiota varten.</p>
+</main>
+
+<script>
+(()=>{
+const C={black:'#000000',white:'#FFFFFF',red:'#68372B',cyan:'#70A4B2',purple:'#6F3D86',green:'#588D43',blue:'#352879',yellow:'#B8C76F',orange:'#6F4F25',brown:'#433900',lred:'#9A6759',dgrey:'#444444',grey:'#6C6C6C',lgreen:'#9AD284',lblue:'#6C5EB5',lgrey:'#959595'};
+const W=320,PLAY=176,PW=10;
+const cv=document.getElementById('game'),ctx=cv.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+
+/* ---------------- world ---------------- */
+const SCREENS={
+ '0,0':{name:'Plaza',theme:'plaza',ex:{l:null,r:'1,0'},
+   plats:[{x:0,y:160,w:320,solid:true},{x:20,y:112,w:92}],
+   ladders:[{x:96,ty:112,by:160},{x:150,ty:160,by:9999}],
+   tramps:[],foes:[{x:250,min:196,max:296,y:160,k:'guard'}],kidnap:true},
+ '1,0':{name:'Cantina',theme:'cantina',ex:{l:'0,0',r:'2,0'},
+   plats:[{x:0,y:160,w:320,solid:true},{x:14,y:104,w:112}],
+   ladders:[{x:112,ty:104,by:160}],
+   tramps:[],foes:[{x:40,min:18,max:92,y:104,k:'guard'}],kidnap:true},
+ '2,0':{name:'Talli',theme:'stable',ex:{l:'1,0',r:'3,0'},
+   plats:[{x:0,y:160,w:320,solid:true},{x:16,y:78,w:120}],
+   ladders:[{x:170,ty:160,by:9999}],
+   tramps:[{x:56,y:148,w:30}],foes:[{x:120,min:100,max:206,y:160,k:'guard'}],kidnap:true},
+ '3,0':{name:'Linnoitus',theme:'fort',ex:{l:'2,0',r:null},
+   plats:[{x:0,y:160,w:320,solid:true},{x:130,y:124,w:110},{x:190,y:90,w:80},{x:240,y:56,w:80}],
+   ladders:[{x:140,ty:124,by:160},{x:228,ty:90,by:124},{x:256,ty:56,by:90}],
+   tramps:[],foes:[{x:200,min:150,max:226,y:124,k:'guard'},{x:278,min:266,max:288,y:56,k:'vargas'}]},
+ '0,1':{name:'Kellari',theme:'cellar',ex:{l:null,r:'1,1'},
+   plats:[{x:0,y:160,w:320,solid:true},{x:196,y:124,w:100}],
+   ladders:[{x:150,ty:-9999,by:160}],
+   tramps:[],foes:[{x:60,min:20,max:120,y:160,k:'guard'}]},
+ '1,1':{name:'Luola',theme:'cave',ex:{l:'0,1',r:'2,1'},
+   plats:[{x:0,y:160,w:320,solid:true},{x:110,y:124,w:80},{x:220,y:88,w:84}],
+   ladders:[],tramps:[{x:262,y:148,w:26}],foes:[{x:60,min:30,max:200,y:160,k:'guard'}]},
+ '2,1':{name:'Kaivos',theme:'mine',ex:{l:'1,1',r:null},
+   plats:[{x:0,y:160,w:320,solid:true},{x:250,y:68,w:70}],
+   ladders:[{x:170,ty:-9999,by:160}],
+   tramps:[{x:212,y:148,w:28}],foes:[{x:80,min:30,max:150,y:160,k:'guard'}]}
+};
+const BASE_ITEMS=[
+ {t:'rum',s:'0,1',x:36,y:160},{t:'key',s:'1,0',x:290,y:160},{t:'cloth',s:'2,1',x:294,y:68},
+ {t:'coin',s:'0,0',x:50,y:112},{t:'coin',s:'0,0',x:72,y:112},{t:'coin',s:'1,0',x:30,y:104},
+ {t:'coin',s:'2,0',x:40,y:78},{t:'coin',s:'2,0',x:76,y:78},{t:'coin',s:'2,0',x:112,y:78},
+ {t:'coin',s:'0,1',x:230,y:124},{t:'coin',s:'0,1',x:270,y:124},{t:'coin',s:'1,1',x:150,y:124},
+ {t:'coin',s:'1,1',x:240,y:88},{t:'coin',s:'1,1',x:284,y:88},{t:'coin',s:'2,1',x:268,y:68},{t:'coin',s:'3,0',x:206,y:90}
+];
+const NAME={rum:'rommipullo',key:'avain',cloth:'punainen liina'};
+
+let G={mode:'title'},F={},items=[];
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+
+function initGame(){
+ F={asleep:false,bull:false,gate:false,vargas:false};
+ items=BASE_ITEMS.map(o=>({...o}));
+ G={mode:'play',scr:null,px:20,py:160,vx:0,vy:0,facing:1,onGround:true,climbing:false,ladder:null,held:null,
+    lives:5,score:0,frames:0,inv:0,lcd:0,lunge:0,stance:1,combat:null,cmove:false,foes:[],fx:[],msg:'',msgT:0,
+    visited:new Set(),kid:null,anim:0,dropT:0,dropY:-1,bullX:250,bullRun:false,clothX:0,luzX:300,winT:0,paused:false,bonus:0};
+ enterScreen('0,0');
+ say('Kapteeni Vargas sieppasi Doña Luzin! Seuraa heitä.');
+}
+function enterScreen(key){
+ const def=SCREENS[key];
+ G.scr=key; endCombat(); G.fx=[]; G.dropT=0;
+ G.foes=def.foes.filter(f=>!(f.k==='vargas'&&F.vargas)).map(f=>({...f,dir:-1,hp:f.k==='vargas'?3:1,st:1,react:0,
+   rd:f.k==='vargas'?14:26,atk:rnd(70,120),wind:0,atkH:1,strikeT:0,dead:false,dt:0,flash:0,anim:0}));
+ G.kid=null;
+ if(!G.visited.has(key)){
+   if(def.kidnap) G.kid={x:150};
+   if(key==='3,0') say('Linnoitus! Doña Luz on tornin huipulla.');
+ }
+ G.visited.add(key);
+ if(key==='2,0'){ G.bullX=F.bull?400:250; G.bullRun=false; }
+}
+function say(m){ if(G.msg===m&&G.msgT>40) return; G.msg=m; G.msgT=200; }
+function endCombat(){ if(G.combat) G.combat.fight=false; G.combat=null; G.lunge=0; G.cmove=false; }
+
+/* ---------------- audio ---------------- */
+let AC=null,muted=false;
+function audioInit(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==='suspended')AC.resume(); }
+function tone(f1,f2,dur,type='square',vol=.08,delay=0){
+ if(!AC||muted) return;
+ const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();
+ o.type=type;o.frequency.setValueAtTime(f1,t);o.frequency.exponentialRampToValueAtTime(Math.max(30,f2),t+dur);
+ g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+ o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+dur+.02);
+}
+function sfx(n){
+ switch(n){
+  case'jump':tone(260,520,.12);break;
+  case'boing':tone(180,760,.28,'triangle',.12);break;
+  case'clang':tone(1600,1200,.07,'square',.06);tone(2400,2000,.05,'square',.04,.02);break;
+  case'swish':tone(900,250,.09,'triangle',.07);break;
+  case'hit':tone(500,90,.18,'sawtooth',.08);break;
+  case'hurt':tone(320,60,.35,'sawtooth',.1);break;
+  case'pick':tone(660,660,.06);tone(990,990,.08,'square',.08,.07);break;
+  case'drop':tone(400,200,.08);break;
+  case'coin':tone(1320,1320,.05,'square',.06);tone(1760,1760,.08,'square',.06,.05);break;
+  case'puzzle':[523,659,784,1046].forEach((f,i)=>tone(f,f,.1,'square',.07,i*.08));break;
+  case'win':[392,523,659,784,659,784,1046].forEach((f,i)=>tone(f,f,.16,'square',.07,i*.14));break;
+  case'over':[392,330,262,196].forEach((f,i)=>tone(f,f*.98,.22,'triangle',.1,i*.2));break;
+ }
+}
+
+/* ---------------- input ---------------- */
+const keys={},pressed={};
+const KEYMAP={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',
+  Space:'jump',KeyX:'jump',KeyK:'jump',KeyZ:'act',KeyE:'act',Enter:'act',KeyJ:'act'};
+function down(k){ if(!keys[k]) pressed[k]=true; keys[k]=true; }
+function up(k){ keys[k]=false; }
+window.addEventListener('keydown',e=>{
+ audioInit();
+ if(e.code==='KeyM'){muted=!muted;return;}
+ if(e.code==='KeyP'&&G.mode==='play'){G.paused=!G.paused;return;}
+ const k=KEYMAP[e.code]; if(!k) return;
+ e.preventDefault(); down(k);
+});
+window.addEventListener('keyup',e=>{const k=KEYMAP[e.code]; if(k){e.preventDefault();up(k);}});
+window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false; if(G.mode==='play')G.paused=true;});
+document.querySelectorAll('.pad button').forEach(b=>{
+ const k=b.dataset.k;
+ b.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();b.setPointerCapture?.(e.pointerId);b.classList.add('on');down(k);});
+ const rel=()=>{b.classList.remove('on');up(k);};
+ b.addEventListener('pointerup',rel);b.addEventListener('pointercancel',rel);b.addEventListener('lostpointercapture',rel);
+ b.addEventListener('contextmenu',e=>e.preventDefault());
+});
+cv.addEventListener('pointerdown',()=>{audioInit();cv.focus(); if(G.mode!=='play'){pressed.act=true;} else if(G.paused){G.paused=false;}});
+
+/* ---------------- helpers ---------------- */
+function rect(g,c,x,y,w,h){g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),w,h);}
+function pline(x0,y0,x1,y1,c){
+ x0=Math.round(x0);y0=Math.round(y0);x1=Math.round(x1);y1=Math.round(y1);
+ ctx.fillStyle=c;let dx=Math.abs(x1-x0),sx=x0<x1?1:-1,dy=-Math.abs(y1-y0),sy=y0<y1?1:-1,err=dx+dy;
+ for(let i=0;i<64;i++){ctx.fillRect(x0,y0,1,1);if(x0===x1&&y0===y1)break;const e2=2*err;if(e2>=dy){err+=dy;x0+=sx;}if(e2<=dx){err+=dx;y0+=sy;}}
+}
+function txt(s,x,y,c,al='left',size=8){
+ ctx.font=size+'px Silkscreen, ui-monospace, monospace';ctx.textAlign=al;ctx.textBaseline='top';
+ ctx.fillStyle=C.black;ctx.fillText(s,x+1,y+1);ctx.fillStyle=c;ctx.fillText(s,x,y);
+}
+function wrap(s,maxW,size=8){
+ ctx.font=size+'px Silkscreen, ui-monospace, monospace';
+ const words=s.split(' '),lines=[];let cur='';
+ for(const w of words){const t=cur?cur+' '+w:w; if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=w;}else cur=t;}
+ if(cur)lines.push(cur);return lines;
+}
+const ladderAt=(def)=>{const cx=G.px+5;return def.ladders.find(l=>cx>=l.x+1&&cx<=l.x+11&&G.py>=(l.ty<-100?-99:l.ty-1)&&G.py<=l.by+1);};
+const platAt=(def,x,y)=>def.plats.find(p=>p.y===y&&x>=p.x&&x<=p.x+p.w);
+
+/* ---------------- backgrounds ---------------- */
+const bgCache={};
+function speckle(g,c,x,y,w,h,n,seed){let s=seed;for(let i=0;i<n;i++){s=(s*9301+49297)%233280;const a=s/233280;s=(s*9301+49297)%233280;const b=s/233280;rect(g,c,x+a*w,y+b*h,1,1);}}
+function drawBg(key){
+ const def=SCREENS[key],c=document.createElement('canvas');c.width=320;c.height=176;const g=c.getContext('2d');
+ const th=def.theme;
+ if(th==='plaza'){
+  rect(g,C.cyan,0,0,320,176);
+  g.fillStyle=C.yellow;g.beginPath();g.arc(276,26,9,0,7);g.fill();
+  rect(g,C.purple,0,128,320,32);rect(g,C.purple,24,112,70,16);rect(g,C.purple,36,104,40,8);rect(g,C.purple,180,110,110,18);rect(g,C.purple,206,98,56,12);
+  // house under roof
+  rect(g,C.lred,22,114,88,46);rect(g,C.brown,52,134,14,26);rect(g,C.black,30,124,10,8);rect(g,C.black,88,124,10,8);rect(g,C.brown,29,132,12,2);rect(g,C.brown,87,132,12,2);
+  rect(g,C.orange,24,112,4,4);rect(g,C.orange,104,112,4,4);
+  // cantina facade
+  rect(g,C.orange,232,92,88,68);rect(g,C.brown,228,88,92,5);rect(g,C.yellow,250,98,52,12);rect(g,C.brown,254,103,44,2);
+  rect(g,C.black,244,120,12,10);rect(g,C.black,296,120,12,10);rect(g,C.brown,312,128,8,32);
+  // well
+  rect(g,C.brown,142,124,2,26);rect(g,C.brown,168,124,2,26);rect(g,C.brown,140,122,32,3);rect(g,C.grey,140,146,32,14);rect(g,C.lgrey,140,146,32,2);
+  rect(g,C.dgrey,154,128,4,6);
+  // cactus
+  rect(g,C.green,192,134,4,26);rect(g,C.green,186,140,3,8);rect(g,C.green,186,146,6,2);rect(g,C.green,199,138,3,8);rect(g,C.green,196,144,6,2);
+ }
+ if(th==='cantina'){
+  rect(g,C.orange,0,0,320,176);rect(g,C.brown,0,0,320,10);rect(g,C.brown,0,130,320,30);
+  [0,140,300].forEach(x=>rect(g,C.brown,x,10,6,120));
+  rect(g,C.lblue,204,52,60,26);rect(g,C.yellow,202,50,64,2);rect(g,C.yellow,202,78,64,2);rect(g,C.yellow,202,50,2,30);rect(g,C.yellow,264,50,2,30);
+  rect(g,C.brown,184,98,92,3);
+  [C.green,C.cyan,C.lred,C.green,C.yellow,C.cyan,C.lred,C.green,C.cyan,C.lred].forEach((cc,i)=>{rect(g,cc,188+i*9,86,3,12);rect(g,cc,189+i*9,83,1,3);});
+  // wanted poster
+  rect(g,C.yellow,40,116,18,22);rect(g,C.yellow,38,124,22,2);rect(g,C.brown,44,120,10,1);rect(g,C.brown,42,123,14,1);rect(g,C.red,44,128,10,2);rect(g,C.brown,42,133,14,1);
+  // lamp
+  rect(g,C.brown,160,10,1,14);rect(g,C.yellow,156,24,9,5);rect(g,C.white,159,25,3,2);
+  rect(g,C.brown,0,126,6,34);rect(g,C.brown,314,126,6,34);
+ }
+ if(th==='stable'){
+  rect(g,C.cyan,0,0,320,176);rect(g,C.purple,0,130,320,30);rect(g,C.purple,220,118,80,12);
+  rect(g,C.red,18,80,116,80);rect(g,C.white,18,80,116,2);
+  rect(g,C.black,40,92,18,12);rect(g,C.yellow,40,100,18,4);
+  rect(g,C.brown,98,112,28,48);for(let i=0;i<28;i++){rect(g,C.white,98+i,112+i*48/28,1,1);rect(g,C.white,125-i,112+i*48/28,1,1);}
+  for(let x=200;x<320;x+=16)rect(g,C.lgrey,x,134,3,26);rect(g,C.lgrey,196,138,124,2);rect(g,C.lgrey,196,148,124,2);
+  // mine shaft frame
+  rect(g,C.brown,164,140,3,20);rect(g,C.brown,185,140,3,20);rect(g,C.brown,162,138,28,3);
+  // windmill-ish water trough
+  rect(g,C.brown,140,150,20,10);rect(g,C.lblue,141,151,18,3);
+ }
+ if(th==='fort'){
+  rect(g,C.cyan,0,0,320,176);rect(g,C.purple,0,126,60,34);rect(g,C.purple,8,114,36,12);
+  rect(g,C.lgrey,60,40,260,120);rect(g,C.lgrey,230,8,90,32);
+  for(let y=40;y<160;y+=8){rect(g,C.grey,60,y,260,1);for(let x=60+((y/8)%2)*8;x<320;x+=16)rect(g,C.grey,x,y,1,8);}
+  for(let y=8;y<40;y+=8){rect(g,C.grey,230,y,90,1);for(let x=230+((y/8)%2)*8;x<320;x+=16)rect(g,C.grey,x,y,1,8);}
+  for(let x=60;x<230;x+=12)rect(g,C.lgrey,x,32,8,8);for(let x=230;x<320;x+=12)rect(g,C.lgrey,x,0,8,8);
+  rect(g,C.black,100,70,3,10);rect(g,C.black,176,60,3,10);rect(g,C.black,290,20,3,10);
+  rect(g,C.black,306,0,1,1);rect(g,C.dgrey,56,104,22,8);rect(g,C.black,60,112,14,48);
+  rect(g,C.purple,100,44,22,30);rect(g,C.yellow,104,52,14,2);rect(g,C.yellow,110,48,2,10);
+ }
+ if(th==='cellar'){
+  rect(g,C.dgrey,0,0,320,176);
+  for(let y=0;y<160;y+=10){rect(g,C.black,0,y,320,1);for(let x=((y/10)%2)*12;x<320;x+=24)rect(g,C.black,x,y,1,10);}
+  for(let i=0;i<3;i++){rect(g,C.brown,8+i*18,140,16,20);rect(g,C.orange,8+i*18,144,16,2);rect(g,C.orange,8+i*18,154,16,2);}
+  rect(g,C.brown,17,122,16,18);rect(g,C.orange,17,126,16,2);rect(g,C.orange,17,135,16,2);
+  for(let i=0;i<9;i++){rect(g,C.black,200+i*10,128,6,28);rect(g,i%2?C.green:C.lred,201+i*10,132,4,4);rect(g,i%2?C.lred:C.green,201+i*10,144,4,4);}
+  rect(g,C.black,150,0,12,6);
+  rect(g,C.brown,96,40,3,10);rect(g,C.yellow,95,34,5,6);rect(g,C.white,96,36,3,2);
+ }
+ if(th==='cave'){
+  rect(g,C.black,0,0,320,176);
+  for(let i=0;i<14;i++){const x=i*24+(i%3)*5;rect(g,C.dgrey,x,0,20,10+(i%4)*4);rect(g,C.lgrey,x+8,10+(i%4)*4,3,6+(i%3)*4);}
+  rect(g,C.dgrey,0,100,40,60);rect(g,C.dgrey,290,40,30,46);rect(g,C.brown,40,140,30,20);
+  speckle(g,C.grey,0,0,320,160,120,7);
+  [[60,60],[180,40],[300,120],[90,100]].forEach(([x,y])=>{rect(g,C.cyan,x,y,2,4);rect(g,C.white,x,y,1,1);});
+  rect(g,C.lblue,40,156,60,4);
+ }
+ if(th==='mine'){
+  rect(g,C.black,0,0,320,176);speckle(g,C.brown,0,0,320,160,260,3);
+  [36,116,300].forEach(x=>{rect(g,C.orange,x,20,4,140);rect(g,C.orange,x-8,18,20,4);rect(g,C.yellow,x-2,26,3,5);});
+  rect(g,C.black,170,0,12,6);
+  for(let x=0;x<250;x+=8)rect(g,C.brown,x,157,4,3);rect(g,C.grey,0,156,250,1);
+  rect(g,C.dgrey,240,40,80,28);
+ }
+ // floors & platforms
+ const ground={plaza:[C.orange,C.yellow,C.brown],stable:[C.orange,C.yellow,C.brown],fort:[C.orange,C.yellow,C.brown],
+   cantina:[C.brown,C.orange,C.black],cellar:[C.grey,C.lgrey,C.dgrey],cave:[C.dgrey,C.grey,C.black],mine:[C.dgrey,C.grey,C.brown]}[th];
+ for(const p of def.plats){
+  if(p.solid){rect(g,ground[0],p.x,p.y,p.w,176-p.y);rect(g,ground[1],p.x,p.y,p.w,2);speckle(g,ground[2],p.x,p.y+3,p.w,176-p.y-3,90,p.y+p.w);}
+  else{rect(g,C.brown,p.x,p.y,p.w,4);rect(g,C.orange,p.x,p.y,p.w,1);for(let x=p.x+4;x<p.x+p.w-2;x+=28){rect(g,C.brown,x,p.y+4,2,4);rect(g,C.brown,x+2,p.y+6,2,2);}}
+ }
+ for(const t of def.tramps){
+  if(th==='stable'){rect(g,C.brown,t.x,t.y+2,t.w,8);rect(g,C.yellow,t.x-1,t.y,t.w+2,4);rect(g,C.black,t.x+3,t.y+8,6,6);rect(g,C.black,t.x+t.w-9,t.y+8,6,6);rect(g,C.grey,t.x+5,t.y+10,2,2);rect(g,C.grey,t.x+t.w-7,t.y+10,2,2);}
+  else{rect(g,C.orange,t.x,t.y+2,2,10);rect(g,C.orange,t.x+t.w-2,t.y+2,2,10);rect(g,C.lgrey,t.x,t.y,t.w,2);rect(g,C.white,t.x+2,t.y,t.w-4,1);}
+ }
+ for(const l of def.ladders){
+  const y0=l.ty<-100?0:l.ty-12,y1=l.by>500?176:l.by;
+  if(l.by>500)rect(g,C.black,l.x-1,160,14,16);
+  rect(g,C.orange,l.x+1,y0,2,y1-y0);rect(g,C.orange,l.x+9,y0,2,y1-y0);
+  for(let y=y0+3;y<y1;y+=6)rect(g,C.yellow,l.x+3,y,6,1);
+ }
+ bgCache[key]=c;return c;
+}
+const bg=k=>bgCache[k]||drawBg(k);
+
+/* ---------------- sprites ---------------- */
+function spr(x,T,face){return(lx,ly,w,h,c)=>{const dx=face>0?lx:(PW-lx-w);ctx.fillStyle=c;ctx.fillRect(x+dx,T+ly,w,h);};}
+function legs(R,ph,air,pant,boot){
+ if(air){R(2,14,2,3,pant);R(6,14,2,4,pant);R(1,17,3,1,boot);R(6,18,3,1,boot);return;}
+ const la=[0,1,0,-1][ph];
+ R(2+la,14,2,5,pant);R(6-la,14,2,5,pant);R(1+la,19,3,1,boot);R(6-la,19,3,1,boot);
+}
+function drawItem(t,cx,f,bob){
+ const x=Math.round(cx-5),y=Math.round(f)+(bob||0);
+ if(t==='rum'){rect(ctx,C.brown,x+3,y-10,4,10);rect(ctx,C.brown,x+4,y-13,2,3);rect(ctx,C.orange,x+4,y-14,2,1);rect(ctx,C.white,x+3,y-7,4,2);rect(ctx,C.lred,x+3,y-5,1,1);}
+ if(t==='key'){rect(ctx,C.yellow,x,y-6,4,4);rect(ctx,C.black,x+1,y-5,2,2);rect(ctx,C.yellow,x+4,y-5,6,1);rect(ctx,C.yellow,x+7,y-4,1,2);rect(ctx,C.yellow,x+9,y-4,1,3);}
+ if(t==='cloth'){rect(ctx,C.red,x,y-4,10,4);rect(ctx,C.lred,x+1,y-4,8,1);rect(ctx,C.red,x+7,y-6,3,2);}
+ if(t==='coin'){const b=Math.sin((G.frames||0)/10+cx)*1.5;rect(ctx,C.yellow,x+3,y-9+b,4,4);rect(ctx,C.white,x+4,y-9+b,1,1);rect(ctx,C.orange,x+6,y-7+b,1,2);}
+}
+function drawHero(x,f,face,o){
+ if(o.inv>0&&(o.inv>>2)%2===0)return;
+ x=Math.round(x);const T=Math.round(f)-20,R=spr(x,T,face);
+ R(1,-2,1,2,C.white);R(0,-3,1,1,C.white);R(1,-1,1,1,C.lgrey);
+ R(3,0,5,2,C.yellow);R(3,2,5,1,C.red);R(0,3,10,1,C.yellow);
+ R(3,4,5,4,C.lred);R(3,5,5,1,C.red);R(6,5,1,1,C.white);R(4,7,3,1,C.orange);
+ R(2,8,6,5,C.white);R(2,8,2,5,C.brown);R(6,8,2,5,C.brown);R(2,13,6,1,C.red);
+ if(o.climb){const s=(o.anim>>3)%2;R(0,s?5:8,2,4,C.white);R(8,s?8:5,2,4,C.white);R(2,14,2,s?4:5,C.dgrey);R(6,14,2,s?5:4,C.dgrey);R(1,s?18:19,3,1,C.black);R(6,s?19:18,3,1,C.black);return;}
+ legs(R,o.moving?(o.anim>>2)%4:0,o.air,C.dgrey,C.black);
+ if(o.fight){
+  R(8,10,2,2,C.white);
+  const hx=face>0?x+10:x-1,hy=T+11,len=12+(o.lunge>0&&o.lunge<12?7:0),dy=[-6,0,5][o.stance];
+  pline(hx,hy,hx+face*len,hy+dy,C.lgrey);rect(ctx,C.yellow,hx,hy-1,1,3);
+ }else{
+  R(8,9,1,4,C.white);R(8,12,1,1,C.lred);
+  if(o.held)drawItem(o.held,x+5+face*7,T+16);
+  else pline(face>0?x+8:x+1,T+13,face>0?x+11:x-2,T+19,C.lgrey);
+ }
+}
+function drawFoe(e){
+ const x=Math.round(e.x),f=Math.round(e.y);
+ const vg=e.k==='vargas',coat=vg?C.purple:C.blue;
+ if(e.dead){
+  if(e.dt>40&&(e.dt>>2)%2)return;
+  rect(ctx,coat,x-4,f-5,16,5);rect(ctx,C.lgrey,x-10,f-4,6,3);rect(ctx,C.lred,x+12,f-6,5,5);rect(ctx,vg?C.black:C.lblue,x+16,f-7,4,6);return;
+ }
+ const face=e.dir,T=f-20,R=spr(x,T,face);
+ if(e.flash>0&&(e.flash>>1)%2){ctx.globalAlpha=.4;}
+ if(vg){R(1,0,9,3,C.black);R(1,2,9,1,C.yellow);R(4,-1,3,1,C.black);}
+ else{R(3,-2,5,4,C.lblue);R(3,2,5,1,C.white);R(5,-3,1,1,C.red);}
+ R(3,3,5,4,C.lred);R(6,4,1,1,C.black);
+ if(vg){R(4,6,4,1,C.black);R(8,6,1,1,C.black);}
+ R(2,7,6,7,coat);R(3,8,1,1,C.white);R(4,9,1,1,C.white);R(5,10,1,1,C.white);R(6,11,1,1,C.white);
+ if(vg){R(1,7,2,1,C.yellow);R(7,7,2,1,C.yellow);}
+ legs(R,e.fight?((e.anim>>2)%4)*(e.moving?1:0):(e.anim>>3)%4,false,vg?C.black:C.lgrey,C.black);
+ if(e.fight){
+  R(8,9,2,2,coat);
+  const hx=face>0?x+10:x-1,hy=T+11;
+  if(e.wind>0){const blink=(e.wind>>2)%2;const dy=[-6,0,5][e.atkH];pline(hx,hy,hx+face*8,hy+dy-4,blink?C.white:C.yellow);}
+  else{const len=12+(e.strikeT>0?7:0),h=e.strikeT>0?e.atkH:e.st,dy=[-6,0,5][h];pline(hx,hy,hx+face*len,hy+dy,C.lgrey);}
+  rect(ctx,C.yellow,hx,hy-1,1,3);
+ }else{R(7,9,2,4,coat);pline(face>0?x+2:x+7,T+13,face>0?x-2:x+11,T+19,C.lgrey);}
+ ctx.globalAlpha=1;
+}
+function drawLuz(x,f,face,anim){
+ x=Math.round(x);const T=Math.round(f)-20,R=spr(x,T,face);
+ R(2,0,6,6,C.black);R(1,1,2,3,C.black);R(3,2,5,4,C.lred);R(6,3,1,1,C.black);R(2,1,1,1,C.white);
+ R(2,7,6,6,C.red);R(1,12,8,7,C.red);R(1,18,8,1,C.white);R(3,7,4,1,C.white);
+ R(0,8,2,4,C.lred);R(8,8,2,4,C.lred);
+ const ph=(anim>>2)%2;R(2+ph,19,2,1,C.black);R(6-ph,19,2,1,C.black);
+}
+function drawBartender(){
+ if(!F.asleep){
+  const x=226,T=96;rect(ctx,C.lred,x+2,T+8,8,7);rect(ctx,C.lred,x+3,T+6,6,2);rect(ctx,C.black,x+2,T+13,8,1);rect(ctx,C.black,x+3,T+10,1,1);rect(ctx,C.black,x+8,T+10,1,1);
+  rect(ctx,C.white,x,T+15,12,26);rect(ctx,C.lgrey,x+2,T+20,8,20);rect(ctx,C.lred,x-3,T+18,3,8);rect(ctx,C.lred,x+12,T+18,3,8);
+ }else{
+  rect(ctx,C.white,222,124,16,12);rect(ctx,C.lred,236,128,8,7);rect(ctx,C.black,236,133,8,1);
+  const z=(G.frames>>4)%3;txt('z',246+z*3,116-z*5,C.white);
+ }
+ rect(ctx,C.brown,176,136,96,24);rect(ctx,C.lgrey,174,133,100,3);
+ for(let x=184;x<268;x+=22)rect(ctx,C.orange,x,140,16,16);for(let x=184;x<268;x+=22)rect(ctx,C.brown,x+2,142,12,12);
+}
+function drawBull(){
+ const x=Math.round(G.bullX),f=160,run=G.bullRun,ph=run?(G.frames>>2)%2:(G.frames>>5)%2;
+ rect(ctx,C.brown,x,f-17,30,11);rect(ctx,C.orange,x+2,f-17,26,2);
+ rect(ctx,C.brown,x-7,f-18,9,8);rect(ctx,C.lgrey,x-8,f-13,3,3);rect(ctx,C.red,x-4,f-16,1,1);
+ rect(ctx,C.white,x-8,f-21,2,3);rect(ctx,C.white,x-1,f-21,2,3);rect(ctx,C.white,x-9,f-22,1,1);rect(ctx,C.white,x+1,f-22,1,1);
+ rect(ctx,C.brown,x+2+ph,f-6,3,6);rect(ctx,C.brown,x+8-ph,f-6,3,6);rect(ctx,C.brown,x+20+ph,f-6,3,6);rect(ctx,C.brown,x+25-ph,f-6,3,6);
+ rect(ctx,C.brown,x+30,f-16,1,8);rect(ctx,C.black,x+30,f-9,2,2);
+ if(!run&&ph){rect(ctx,C.white,x-10,f-12,1,1);rect(ctx,C.white,x-12,f-11,1,1);}
+}
+
+/* ---------------- update ---------------- */
+function update(){
+ G.frames++;
+ if(G.msgT>0)G.msgT--;if(G.inv>0)G.inv--;if(G.lcd>0)G.lcd--;
+ const def=SCREENS[G.scr];
+ G.fx=G.fx.filter(f=>++f.t<f.life);
+ if(G.kid){G.kid.x+=1.8;if(G.kid.x>340)G.kid=null;}
+ if(G.bullRun){G.bullX+=2.6;G.clothX+=2.6;if(G.bullX>360)G.bullRun=false;}
+ for(const e of G.foes){
+  if(e.dead){e.dt++;continue;}
+  if(e.flash>0)e.flash--;if(e.strikeT>0)e.strikeT--;
+  if(!e.fight){e.x+=e.dir*(e.k==='vargas'?.25:.4);e.anim++;if(e.x<e.min){e.x=e.min;e.dir=1;}if(e.x>e.max){e.x=e.max;e.dir=-1;}}
+ }
+ G.foes=G.foes.filter(e=>!(e.dead&&e.dt>70));
+ if(G.winT>0){
+  G.winT--;
+  const tx=G.px+14;if(Math.abs(G.luzX-tx)>1)G.luzX+=G.luzX>tx?-.6:.6;
+  if(G.frames%18===0)G.fx.push({k:'heart',x:G.px+8,y:G.py-24,t:0,life:50});
+  if(G.winT===0){G.mode='win';G.final=Math.floor(G.frames/60);G.bonus=Math.max(0,3000-Math.floor(G.frames/60)*5);G.score+=G.bonus;sfx('win');}
+  return;
+ }
+ if(G.combat)combatUpdate(def);else moveUpdate(def);
+ if(G.mode!=='play')return;
+ blockers();
+ const cx=G.px+5;
+ for(const it of items){
+  if(it.s===G.scr&&it.t==='coin'&&Math.abs(it.x-cx)<7&&G.py-it.y>-6&&G.py-it.y<24){it.got=true;G.score+=50;sfx('coin');}
+ }
+ items=items.filter(i=>!i.got);
+ if(pressed.act&&!G.combat&&!G.climbing&&G.onGround)action();
+ if(!G.combat&&!G.climbing&&G.onGround){
+  for(const e of G.foes){
+   if(!e.dead&&Math.abs(G.py-e.y)<1&&Math.abs(e.x-G.px)<40){engage(e);break;}
+  }
+ }
+}
+function action(){
+ const cx=G.px+5;
+ const near=items.filter(i=>i.s===G.scr&&i.t!=='coin'&&i.y===G.py&&Math.abs(i.x-cx)<11).sort((a,b)=>Math.abs(a.x-cx)-Math.abs(b.x-cx))[0];
+ if(near){
+  items=items.filter(i=>i!==near);
+  if(G.held)items.push({t:G.held,s:G.scr,x:cx,y:G.py});
+  G.held=near.t;say('Otit: '+NAME[near.t]+'.');sfx('pick');
+ }else if(G.held){
+  items.push({t:G.held,s:G.scr,x:cx,y:G.py});say('Laskit maahan: '+NAME[G.held]+'.');G.held=null;sfx('drop');
+ }
+}
+function engage(e){
+ endCombat();G.combat=e;e.fight=true;e.atk=rnd(40,80);e.wind=0;e.st=rnd(0,2);G.stance=1;
+ if(G.held){items.push({t:G.held,s:G.scr,x:G.px+5,y:G.py});G.held=null;say('Miekat esiin! Esine putosi maahan.');}
+ else if(e.k==='vargas')say('Vargas: Tule vain, naamioitu nuori!');
+ sfx('swish');
+}
+function moveUpdate(def){
+ const L=keys.left,R=keys.right,U=keys.up,D=keys.down;
+ if(G.climbing){
+  const l=G.ladder;
+  if(pressed.jump){G.climbing=false;G.vy=0;return;}
+  if(U){G.py-=1;G.anim++;
+   if(l.ty<-100){if(G.py<=2)return goVert(-1);}
+   else if(G.py<=l.ty){G.py=l.ty;G.climbing=false;G.onGround=true;}
+  }else if(D){G.py+=1;G.anim++;
+   if(l.by>500){if(G.py>=192)return goVert(1);}
+   else if(G.py>=l.by){G.py=l.by;G.climbing=false;G.onGround=true;}
+  }
+  return;
+ }
+ const lad=ladderAt(def);
+ if(lad){
+  const top=lad.ty<-100?-99:lad.ty;
+  if(U&&G.py>top+.5&&G.py<=lad.by+.5){startClimb(lad);return;}
+  if(D&&G.onGround&&G.py>=top-.5&&G.py<lad.by-.5){startClimb(lad);return;}
+ }
+ const mv=(R?1:0)-(L?1:0);
+ G.vx=mv*1.3;if(mv)G.facing=mv;
+ if((pressed.jump||(pressed.up&&!lad))&&G.onGround){G.vy=-4.2;G.onGround=false;sfx('jump');}
+ if(pressed.down&&G.onGround&&!lad){const p=platAt(def,G.px+5,G.py);if(p&&!p.solid){G.dropY=p.y;G.dropT=10;G.py+=1;G.onGround=false;}}
+ G.px+=G.vx;if(mv&&G.onGround)G.anim++;
+ if(G.px<0){if(def.ex.l)return goHoriz(-1);G.px=0;}
+ if(G.px>W-PW){if(def.ex.r)return goHoriz(1);G.px=W-PW;}
+ G.vy=Math.min(G.vy+.22,5);
+ const prev=G.py;G.py+=G.vy;G.onGround=false;
+ if(G.dropT>0)G.dropT--;
+ const cx=G.px+5;
+ if(G.vy>=0){
+  let landed=false;
+  for(const t of def.tramps){if(cx>=t.x&&cx<=t.x+t.w&&prev<=t.y&&G.py>=t.y){G.py=t.y;G.vy=-6.6;sfx('boing');landed=true;break;}}
+  if(!landed)for(const p of def.plats){
+   if(G.dropT>0&&p.y===G.dropY)continue;
+   if(cx>=p.x&&cx<=p.x+p.w&&prev<=p.y+.01&&G.py>=p.y){G.py=p.y;G.vy=0;G.onGround=true;break;}
+  }
+ }
+ if(G.py>176){G.py=160;G.vy=0;}
+}
+function startClimb(l){G.climbing=true;G.ladder=l;G.px=l.x+1;G.vy=0;G.vx=0;G.onGround=false;}
+function goVert(dir){
+ const [sx,sy]=G.scr.split(',').map(Number),key=sx+','+(sy+dir);
+ const x=G.px;enterScreen(key);
+ const l=SCREENS[key].ladders.find(l=>Math.abs(l.x+1-x)<3);
+ if(!l){G.climbing=false;G.py=160;return;}
+ G.ladder=l;G.climbing=true;G.px=l.x+1;G.py=dir<0?190:6;
+}
+function goHoriz(dir){
+ const def=SCREENS[G.scr];const key=dir>0?def.ex.r:def.ex.l;
+ enterScreen(key);G.px=dir>0?1:W-PW-1;
+}
+function combatUpdate(def){
+ const e=G.combat;
+ const pcx=G.px+5,ecx=e.x+5;
+ G.facing=ecx>pcx?1:-1;e.dir=pcx>ecx?1:-1;
+ const mv=(keys.right?1:0)-(keys.left?1:0);
+ G.cmove=mv!==0;if(mv){G.px+=mv*.7;G.anim++;}
+ if(G.facing>0&&G.px+5>ecx-15)G.px=ecx-20;
+ if(G.facing<0&&G.px+5<ecx+15)G.px=ecx+10;
+ G.px=Math.max(0,Math.min(W-PW,G.px));
+ let dist=Math.abs(e.x-G.px);
+ const ep=platAt(def,e.x+5,e.y);
+ e.moving=false;
+ if(dist>23){e.x+=e.dir*.55;e.moving=true;}else if(dist<19){e.x-=e.dir*.4;e.moving=true;}
+ if(ep)e.x=Math.max(ep.x,Math.min(ep.x+ep.w-PW,e.x));
+ if(e.moving)e.anim++;
+ dist=Math.abs(e.x-G.px);
+ if(pressed.up)G.stance=Math.max(0,G.stance-1);
+ if(pressed.down)G.stance=Math.min(2,G.stance+1);
+ if(e.st!==G.stance){if(++e.react>=e.rd){e.st=G.stance;e.react=0;}}else e.react=0;
+ if(pressed.act&&G.lcd<=0){G.lunge=14;G.lcd=28;sfx('swish');}
+ if(G.lunge>0){
+  G.lunge--;
+  if(G.lunge===8){
+   if(dist<=32){
+    if(G.stance!==e.st){
+     e.hp--;e.flash=14;e.x+=e.dir*8;sfx('hit');
+     if(e.hp<=0){defeat(e);return;}
+    }else{sfx('clang');spark((G.px+e.x)/2+5,G.py-10+[-5,0,4][G.stance]);}
+   }
+  }
+ }
+ if(e.wind>0){
+  if(--e.wind===0){
+   e.strikeT=10;
+   if(dist<=34&&G.inv<=0){
+    if(G.stance===e.atkH){G.score+=10;sfx('clang');spark((G.px+e.x)/2+5,G.py-10+[-5,0,4][e.atkH]);}
+    else{playerHit(e);if(G.mode!=='play')return;}
+   }
+   e.atk=e.k==='vargas'?rnd(50,85):rnd(85,140);
+  }
+ }else if(--e.atk<=0){e.wind=e.k==='vargas'?22:34;e.atkH=rnd(0,2);}
+ if(!platAt(def,G.px+5,G.py)){G.onGround=false;endCombat();return;}
+ if(Math.abs(e.x-G.px)>64)endCombat();
+}
+function spark(x,y){G.fx.push({k:'spark',x,y,t:0,life:10});}
+function playerHit(e){
+ G.lives--;G.inv=70;sfx('hurt');
+ G.px+=e.dir*22;G.px=Math.max(0,Math.min(W-PW,G.px));
+ if(G.lives<=0){G.mode='over';sfx('over');return;}
+ say(e.k==='vargas'?'Vargas osui! Torju samalla korkeudella.':'Osuma! Torju iskut samalla korkeudella.');
+}
+function defeat(e){
+ e.dead=true;e.dt=0;endCombat();
+ G.fx.push({k:'feather',x:e.x+5,y:e.y-14,t:0,life:70});
+ if(e.k==='vargas'){F.vargas=true;G.score+=1000;G.winT=170;G.luzX=300;say('Vargas kaatui! Doña Luz on vapaa!');sfx('puzzle');}
+ else{G.score+=100;}
+}
+function blockers(){
+ const s=G.scr;
+ if(s==='1,0'&&!F.asleep&&G.py>130&&G.px+PW>178){
+  if(G.held==='rum'){G.held=null;F.asleep=true;G.score+=250;say('Baarimikko joi rommin ja nukahti tiskille.');sfx('puzzle');}
+  else{G.px=178-PW;say('Baarimikko: Ei juomaa, ei pääsyä tiskin ohi!');}
+ }
+ if(s==='2,0'&&!F.bull&&G.py>120&&G.px+PW>230){
+  if(G.held==='cloth'){G.held=null;F.bull=true;G.bullRun=true;G.clothX=G.bullX+50;G.score+=250;say('Härkä ryntäsi punaisen liinan perään!');sfx('puzzle');}
+  else{G.px=230-PW;say('Härkä tukkii tien. Jos olisi jotain punaista...');}
+ }
+ if(s==='3,0'&&!F.gate&&G.py>100&&G.px+PW>60&&G.px<74){
+  if(G.held==='key'){G.held=null;F.gate=true;G.score+=250;say('Avain sopi. Portti aukeaa!');sfx('puzzle');}
+  else{G.px=60-PW;say('Linnoituksen portti on lukossa.');}
+ }
+}
+
+/* ---------------- render ---------------- */
+function render(){
+ ctx.clearRect(0,0,320,200);
+ if(G.mode==='title'){drawTitle();return;}
+ ctx.drawImage(bg(G.scr),0,0);
+ if(G.scr==='3,0'&&!F.gate){rect(ctx,C.brown,60,112,14,48);rect(ctx,C.black,60,120,14,2);rect(ctx,C.black,60,148,14,2);rect(ctx,C.black,66,112,1,48);rect(ctx,C.yellow,70,136,2,3);}
+ if(G.scr==='1,0')drawBartender();
+ if(G.scr==='2,0'){
+  if(G.bullX<340)drawBull();
+  if(G.bullRun&&G.clothX<340)drawItem('cloth',G.clothX,150);
+ }
+ for(const it of items)if(it.s===G.scr)drawItem(it.t,it.x,it.y);
+ if(G.scr==='3,0'&&(F.vargas||G.winT>0))drawLuz(G.luzX,56,G.luzX>G.px?-1:1,G.frames);
+ else if(G.scr==='3,0')drawLuz(300,56,-1,0);
+ for(const e of G.foes)drawFoe(e);
+ if(G.kid){const k=G.kid;const R=spr(Math.round(k.x),140,1);drawFoe({k:'guard',x:k.x,y:160,dir:1,fight:false,anim:G.frames*2,dead:false,flash:0});
+  rect(ctx,C.red,k.x-4,136,14,5);rect(ctx,C.black,k.x+9,134,4,5);rect(ctx,C.lred,k.x+8,136,3,3);rect(ctx,C.white,k.x-5,136,2,5);}
+ drawHero(G.px,G.py,G.facing,{inv:G.inv,climb:G.climbing,anim:G.anim,moving:G.combat?G.cmove:(G.vx!==0&&G.onGround),air:!G.onGround&&!G.climbing&&!G.combat,
+   fight:!!G.combat,stance:G.stance,lunge:G.lunge,held:G.held});
+ for(const f of G.fx){
+  if(f.k==='spark'){for(let i=0;i<6;i++){const a=i*1.05+f.t*.3,r=f.t*.8;rect(ctx,i%2?C.white:C.yellow,f.x+Math.cos(a)*r,f.y+Math.sin(a)*r,1,1);}}
+  if(f.k==='feather'&&((f.life-f.t)>20||(f.t>>1)%2)){const y=f.y-f.t*.25,x=f.x+Math.sin(f.t/8)*4;
+    pline(x-5,y+6,x+5,y-6,C.white);for(let i=-4;i<=4;i+=2){pline(x+i,y-i*1.2,x+i-3,y-i*1.2-2,C.lgrey);pline(x+i,y-i*1.2,x+i+2,y-i*1.2+3,C.lgrey);}}
+  if(f.k==='heart'){const y=f.y-f.t*.4;rect(ctx,C.lred,f.x,y,2,2);rect(ctx,C.lred,f.x+3,y,2,2);rect(ctx,C.lred,f.x,y+1,5,2);rect(ctx,C.lred,f.x+1,y+3,3,1);rect(ctx,C.lred,f.x+2,y+4,1,1);}
+ }
+ if(G.msgT>0&&G.msg){
+  const lines=wrap(G.msg,300);ctx.globalAlpha=Math.min(1,G.msgT/20);
+  rect(ctx,C.black,0,0,320,4+lines.length*10);lines.forEach((l,i)=>txt(l,160,3+i*10,C.white,'center'));ctx.globalAlpha=1;
+ }
+ drawHud();
+ if(G.paused){overlay();txt('TAUKO',160,72,C.yellow,'center',16);txt('Jatka painamalla P tai napauttamalla',160,98,C.white,'center');}
+ if(G.mode==='over'){overlay();txt('PELI PÄÄTTYI',160,52,C.lred,'center',16);txt('Vargas voitti tällä kertaa.',160,80,C.white,'center');txt('Pisteet '+G.score,160,96,C.yellow,'center');
+  if((G.frames>>5)%2===0)txt('Uusi yritys: välilyönti tai napautus',160,130,C.cyan,'center');}
+ if(G.mode==='win'){overlay();txt('DOÑA LUZ ON VAPAA!',160,40,C.yellow,'center',16);
+  const s=G.final;txt('Aika '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0'),160,72,C.white,'center');
+  txt('Aikabonus '+G.bonus,160,84,C.white,'center');txt('Pisteet '+G.score,160,100,C.yellow,'center');
+  drawHero(146,150,1,{moving:false});drawLuz(162,150,-1,0);
+  if((G.frames>>5)%2===0)txt('Uusi peli: välilyönti tai napautus',160,160,C.cyan,'center');}
+}
+function overlay(){ctx.globalAlpha=.78;rect(ctx,C.blue,0,0,320,176);ctx.globalAlpha=1;}
+function drawHud(){
+ rect(ctx,C.black,0,176,320,24);rect(ctx,C.lblue,0,176,320,1);
+ txt('KÄDESSÄ',4,180,C.lgrey);
+ rect(ctx,C.dgrey,56,179,16,18);if(G.held)drawItem(G.held,64,195);
+ for(let i=0;i<G.lives;i++){const x=82+i*11;rect(ctx,C.yellow,x+2,182,6,3);rect(ctx,C.red,x+2,185,6,1);rect(ctx,C.yellow,x,186,10,1);}
+ txt(SCREENS[G.scr].name,82,190,C.cyan);
+ txt('PISTEET '+String(G.score).padStart(5,'0'),316,180,C.white,'right');
+ const s=Math.floor(G.frames/60);txt(Math.floor(s/60)+':'+String(s%60).padStart(2,'0'),316,190,C.lgrey,'right');
+}
+let tFrames=0;
+function drawTitle(){
+ tFrames++;
+ ctx.drawImage(bg('3,0'),0,0);ctx.globalAlpha=.72;rect(ctx,C.blue,0,0,320,200);ctx.globalAlpha=1;
+ txt('EL HALCÓN',160,22,C.yellow,'center',24);
+ txt('Rescate en San Ramón',160,52,C.white,'center');
+ const lines=wrap('Kapteeni Vargas on siepannut Doña Luzin. Ratkaise pulmat, voita vartijat ja pelasta hänet linnoituksesta.',260);
+ lines.forEach((l,i)=>txt(l,160,74+i*11,C.lgrey,'center'));
+ drawHero(130,168,1,{moving:true,anim:tFrames,fight:true,stance:[0,1,2,1][(tFrames>>5)%4],lunge:(tFrames%64)<14?(tFrames%64):0});
+ drawFoe({k:'vargas',x:170,y:168,dir:-1,fight:true,st:1,wind:0,strikeT:0,anim:0,moving:false,dead:false,flash:0});
+ rect(ctx,C.yellow,100,168,120,1);
+ if((tFrames>>5)%2===0)txt('Aloita: välilyönti tai napautus',160,180,C.cyan,'center');
+}
+
+/* ---------------- loop ---------------- */
+function step(){
+ if(G.mode==='play'){
+  if(!G.paused)update();
+ }else{
+  if(pressed.jump||pressed.act){initGame();}
+  if(G.mode!=='title')G.frames++;
+ }
+ for(const k in pressed)delete pressed[k];
+}
+let last=performance.now(),acc=0;const DT=1000/60;
+function frame(now){
+ acc+=Math.min(100,now-last);last=now;
+ while(acc>=DT){step();acc-=DT;}
+ render();requestAnimationFrame(frame);
+}
+if(document.fonts&&document.fonts.load){document.fonts.load('8px Silkscreen').catch(()=>{});}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
