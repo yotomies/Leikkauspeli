@@ -568,8 +568,8 @@ function update(){
   if(keys.up){ p.spin=Math.min(p.spin+1,30); if(p.spin>8) p.vy-=0.32; if(frame%5===0) beep(60+p.spin*3,0.06,'square',0.018); }
   else p.spin=Math.max(0,p.spin-2);
   p.anim += p.spin>8?1:(p.spin>0?0.5:0);
-  p.vy+=0.16; if(keys.down && !p.ground) p.vy+=0.12;
-  p.vy=Math.max(-2,Math.min(3,p.vy));
+  p.vy+= keys.up ? 0.16 : 0.10; if(keys.down && !p.ground) p.vy+=0.12;
+  p.vy=Math.max(-2,Math.min(keys.down?3:2.6,p.vy));
   moveX(p,p.vx); p.ground=false; moveY(p,p.vy);
   if(!p.ground){ const probe={x:p.x,y:p.y+0.5,w:p.w,h:p.h}; if(collides(probe)) p.ground=true; }
 
