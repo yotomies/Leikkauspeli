@@ -302,59 +302,87 @@ function pressed(k){ return keys[k] && !prev[k]; }
 let tap=false;
 cv.addEventListener('pointerdown',()=>{ initAudio(); tap=true; cv.focus(); });
 
-const coarse=!!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
-const touchMode=coarse;
+const mm=q=>!!(window.matchMedia && matchMedia(q).matches);
+const coarse = mm('(pointer: coarse)') || mm('(any-pointer: coarse)') || (navigator.maxTouchPoints>0 && !mm('(pointer: fine)'));
+let touchMode=false;
 function vibe(pat){ try{ if(navigator.vibrate) navigator.vibrate(pat); }catch(e){} }
-if(touchMode){
+const touchEl=document.getElementById('touch'), stick=document.getElementById('stick'), knob=document.getElementById('knob');
+function enableTouch(){
+  if(touchMode) return; touchMode=true;
   document.body.classList.add('touchmode');
   document.getElementById('help').style.display='none';
-  const touchEl=document.getElementById('touch'), stick=document.getElementById('stick'), knob=document.getElementById('knob');
-  touchEl.classList.add('on');
-  touchEl.addEventListener('contextmenu',e=>e.preventDefault());
-  // buttons
-  touchEl.querySelectorAll('button[data-k]').forEach(b=>{
-    const k=b.dataset.k;
-    const on=e=>{ e.preventDefault(); initAudio(); keys[k]=true; b.classList.add('down'); try{b.setPointerCapture(e.pointerId)}catch(_){} };
-    const off=e=>{ keys[k]=false; b.classList.remove('down'); };
-    b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off);
-    b.addEventListener('pointercancel',off); b.addEventListener('lostpointercapture',off);
-  });
-  // floating joystick on the left half
-  let sid=null, ox=0, oy=0; const RAD=48;
-  const place=()=>{ stick.style.left=ox+'px'; stick.style.top=oy+'px'; };
-  const upd=(x,y)=>{
-    let dx=x-ox, dy=y-oy; const d=Math.hypot(dx,dy);
-    if(d>RAD){ ox+=dx*(1-RAD/d); oy+=dy*(1-RAD/d); place(); dx=x-ox; dy=y-oy; }
-    knob.style.transform='translate('+dx+'px,'+dy+'px)';
-    keys.left=dx<-14; keys.right=dx>14; keys.up=dy<-16; keys.down=dy>24;
-  };
-  touchEl.addEventListener('pointerdown',e=>{
-    initAudio();
-    if(e.target.closest('button')) { tap=true; return; }
-    e.preventDefault();
-    if(e.clientX<innerWidth*0.5 && sid===null){
-      sid=e.pointerId; ox=e.clientX; oy=e.clientY; place(); stick.classList.add('active');
-      try{touchEl.setPointerCapture(e.pointerId)}catch(_){}
-      upd(e.clientX,e.clientY);
-    } else tap=true;
-  });
-  touchEl.addEventListener('pointermove',e=>{ if(e.pointerId===sid) upd(e.clientX,e.clientY); });
-  const end=e=>{ if(e.pointerId!==sid) return; sid=null; keys.left=keys.right=keys.up=keys.down=false;
-    stick.classList.remove('active'); stick.style.left=''; stick.style.top=''; knob.style.transform=''; };
-  touchEl.addEventListener('pointerup',end); touchEl.addEventListener('pointercancel',end);
-  // fullscreen + landscape lock where supported
-  const fsBtn=document.getElementById('fsBtn'), D=document;
-  if(!(D.fullscreenEnabled||D.webkitFullscreenEnabled)) fsBtn.style.display='none';
-  fsBtn.addEventListener('click',()=>{
-    try{
-      if(!(D.fullscreenElement||D.webkitFullscreenElement)){
-        const el=D.documentElement, req=el.requestFullscreen||el.webkitRequestFullscreen;
-        if(req) Promise.resolve(req.call(el)).then(()=>{ try{ screen.orientation.lock('landscape').catch(()=>{}); }catch(_){} }).catch(()=>{});
-      } else { const ex=D.exitFullscreen||D.webkitExitFullscreen; if(ex) ex.call(D); }
-    }catch(_){}
-  });
-  addEventListener('fullscreenchange',()=>setTimeout(fit,100));
+  touchEl.classList.add('on'); fit();
 }
+// --- touch tracking: each finger is a joystick, a button or a plain tap ---
+const active=new Map(); let sid=null, ox=0, oy=0; const RAD=48;
+function place(){ stick.style.left=ox+'px'; stick.style.top=oy+'px'; }
+function upd(x,y){
+  let dx=x-ox, dy=y-oy; const d=Math.hypot(dx,dy);
+  if(d>RAD){ ox+=dx*(1-RAD/d); oy+=dy*(1-RAD/d); place(); dx=x-ox; dy=y-oy; }
+  knob.style.transform='translate('+dx+'px,'+dy+'px)';
+  keys.left=dx<-14; keys.right=dx>14; keys.up=dy<-16; keys.down=dy>24;
+}
+function btnFrom(el){ return el && el.closest ? el.closest('#touch button') : null; }
+function pressBtn(b){ if(b && b.dataset.k){ keys[b.dataset.k]=true; b.classList.add('down'); } }
+function releaseBtn(b){
+  if(!b || !b.dataset.k) return;
+  for(const v of active.values()) if(v.btn===b) return;
+  keys[b.dataset.k]=false; b.classList.remove('down');
+}
+function toggleFS(){
+  const D=document;
+  try{
+    if(!(D.fullscreenElement||D.webkitFullscreenElement)){
+      const el=D.documentElement, req=el.requestFullscreen||el.webkitRequestFullscreen;
+      if(req) Promise.resolve(req.call(el)).then(()=>{ try{ screen.orientation.lock('landscape').catch(()=>{}); }catch(_){} }).catch(()=>{});
+    } else { const ex=D.exitFullscreen||D.webkitExitFullscreen; if(ex) ex.call(D); }
+  }catch(_){}
+}
+function tStart(id,x,y,target){
+  initAudio();
+  const b=btnFrom(target);
+  if(b && b.id==='fsBtn'){ active.set(id,{kind:'fs'}); return; }
+  if(b){ active.set(id,{kind:'btn',btn:b}); pressBtn(b); tap=true; return; }
+  if(x<window.innerWidth*0.5 && sid===null){
+    sid=id; ox=x; oy=y; place(); stick.classList.add('active'); active.set(id,{kind:'stick'}); upd(x,y); return;
+  }
+  active.set(id,{kind:'tap'}); tap=true;
+}
+function tMove(id,x,y){
+  const a=active.get(id); if(!a) return;
+  if(a.kind==='stick') upd(x,y);
+  else if(a.kind==='btn'){
+    const b=btnFrom(document.elementFromPoint(x,y));
+    if(b && b!==a.btn && b.dataset.k && b.dataset.k!=='pause' && a.btn.dataset.k!=='pause'){ const old=a.btn; a.btn=b; releaseBtn(old); pressBtn(b); }
+  }
+}
+function tEnd(id){
+  const a=active.get(id); if(!a) return; active.delete(id);
+  if(a.kind==='stick'){ sid=null; keys.left=keys.right=keys.up=keys.down=false;
+    stick.classList.remove('active'); stick.style.left=''; stick.style.top=''; knob.style.transform=''; }
+  else if(a.kind==='btn') releaseBtn(a.btn);
+  else if(a.kind==='fs') toggleFS();
+}
+function releaseAll(){ for(const id of Array.from(active.keys())) tEnd(id); }
+if('ontouchstart' in window){
+  const each=(e,fn)=>{ for(let i=0;i<e.changedTouches.length;i++){ const t=e.changedTouches[i]; fn(t.identifier,t.clientX,t.clientY,t.target); } };
+  touchEl.addEventListener('touchstart',e=>{ e.preventDefault(); each(e,tStart); },{passive:false});
+  touchEl.addEventListener('touchmove',e=>{ e.preventDefault(); each(e,tMove); },{passive:false});
+  touchEl.addEventListener('touchend',e=>{ e.preventDefault(); each(e,id=>tEnd(id)); },{passive:false});
+  touchEl.addEventListener('touchcancel',e=>{ each(e,id=>tEnd(id)); },{passive:false});
+  // any touch anywhere switches the touch controls on, even if detection missed the device
+  document.addEventListener('touchstart',()=>enableTouch(),{passive:true,capture:true});
+} else {
+  touchEl.addEventListener('pointerdown',e=>{ e.preventDefault(); try{touchEl.setPointerCapture(e.pointerId)}catch(_){} tStart(e.pointerId,e.clientX,e.clientY,e.target); });
+  touchEl.addEventListener('pointermove',e=>tMove(e.pointerId,e.clientX,e.clientY));
+  touchEl.addEventListener('pointerup',e=>tEnd(e.pointerId));
+  touchEl.addEventListener('pointercancel',e=>tEnd(e.pointerId));
+}
+touchEl.addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('blur',releaseAll);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) releaseAll(); });
+{ const D=document; if(!(D.fullscreenEnabled||D.webkitFullscreenEnabled)) document.getElementById('fsBtn').style.display='none'; }
+addEventListener('fullscreenchange',()=>setTimeout(fit,100));
 
 // ---------- scaling ----------
 function fit(){
@@ -370,7 +398,9 @@ function fit(){
   cv.style.width=Math.round(VW*s)+'px'; cv.style.height=Math.round((VH+HUD)*s)+'px';
 }
 addEventListener('orientationchange',()=>setTimeout(fit,200));
+
 addEventListener('resize',fit); fit();
+if(coarse) enableTouch();
 
 // ---------- world ----------
 let grid=[], rows=0, cols=0, theme=THEMES[0];
@@ -783,7 +813,7 @@ function drawTitle(){
   const hy=70+Math.sin(frame*0.06)*6; drawHero(VW/2-5,hy,1,frame*0.8,false);
   const lines=['Kaivosmiehet jäivät loukkuun.','25 tasoa. Lennä alas, raivaa seinät','ja pelasta joka tasolta yksi mies.'];
   lines.forEach((l,i)=>txt(l,VW/2,100+i*12,C.white,8,'center'));
-  if(frame%60<40) txt(coarse?'Napauta oikealta aloittaaksesi':'Paina välilyöntiä',VW/2,138,C.yellow,8,'center',true);
+  if(frame%60<40) txt(touchMode?'Napauta oikealta aloittaaksesi':'Paina välilyöntiä',VW/2,138,C.yellow,8,'center',true);
   if(unlocked>0) txt('< Aloitustaso '+(startSel+1)+' / '+LEVELS.length+' >',VW/2,152,C.cyan,8,'center');
   R(0,VH,VW,62,'#6C6C6C'); R(0,VH+62,VW,HUD-62,'#000');
   txt('Ennätys',VW/2,VH+12,C.white,8,'center',true);
@@ -815,7 +845,7 @@ function render(){
     txt('Kaivosmies pelastettu!',VW/2,VH/2-14,C.yellow,8,'center'); txt('Bonus lasketaan',VW/2,VH/2+4,C.white,8,'center'); }
   if(state==='over'){ R(VW/2-80,VH/2-26,160,52,'#000'); R(VW/2-80,VH/2-26,160,2,C.lred);
     txt('Peli päättyi',VW/2,VH/2-16,C.lred,8,'center'); txt('Pisteet '+score,VW/2,VH/2-2,C.white,8,'center');
-    if(timer<=0) txt(coarse?'Napauta jatkaaksesi':'Paina välilyöntiä',VW/2,VH/2+12,C.yellow,8,'center'); }
+    if(timer<=0) txt(touchMode?'Napauta jatkaaksesi':'Paina välilyöntiä',VW/2,VH/2+12,C.yellow,8,'center'); }
 }
 
 // ---------- loop ----------

@@ -90,18 +90,16 @@ tr.me td{color:var(--orange);font-weight:700}
 #pauseBtn{position:absolute;left:72%;top:1.5%;width:44px;height:44px;font-size:10px;pointer-events:auto}
 .touchonly{display:none}
 #rotate{display:none}
-@media (pointer:coarse){
-  body{padding:0;min-height:100vh;min-height:100dvh;justify-content:center;background:#000}
-  #stage{width:min(100vw, calc(100vh * 1.6));width:min(100vw, calc(100dvh * 1.6));border:0;box-shadow:none}
-  #help,.kbonly{display:none!important}
-  .touchonly{display:block}
-  h1{font-size:clamp(16px,4vw,28px)}
-  .panel{padding:10px 12px}
-  .copper{height:26px;margin:-10px -12px 8px}
-}
-@media (pointer:coarse) and (orientation:portrait){
-  #rotate{display:flex;position:fixed;inset:0;z-index:50;background:#001a44;color:#fff;align-items:center;justify-content:center;flex-direction:column;gap:18px;text-align:center;padding:24px;font:12px/1.8 "Press Start 2P",monospace}
-  #rotate .ph{width:46px;height:80px;border:4px solid #fff;border-radius:8px;animation:rot 2s ease-in-out infinite}
+html.touchmode body{padding:0;min-height:100vh;min-height:100dvh;justify-content:center;background:#000}
+html.touchmode #stage{width:min(100vw, calc(100vh * 1.6));width:min(100vw, calc(100dvh * 1.6));border:0;box-shadow:none}
+html.touchmode #help,html.touchmode .kbonly{display:none!important}
+html.touchmode .touchonly{display:block}
+html.touchmode h1{font-size:clamp(16px,4vw,28px)}
+html.touchmode .panel{padding:10px 12px}
+html.touchmode .copper{height:26px;margin:-10px -12px 8px}
+@media (orientation:portrait){
+  html.touchmode #rotate{display:flex;position:fixed;inset:0;z-index:50;background:#001a44;color:#fff;align-items:center;justify-content:center;flex-direction:column;gap:18px;text-align:center;padding:24px;font:12px/1.8 "Press Start 2P",monospace}
+  html.touchmode #rotate .ph{width:46px;height:80px;border:4px solid #fff;border-radius:8px;animation:rot 2s ease-in-out infinite}
   @keyframes rot{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
 }
 @media (prefers-reduced-motion:reduce){#rotate .ph{animation:none;transform:rotate(-90deg)}}
@@ -469,7 +467,16 @@ function makeCar(d,slot,T,demo){
 const topSpeed=c=>(3.0+0.33*c.engine)*(1-c.damage/260)*((c.human&&!c.finished)?1:c.ai.skill);
 
 const TS={id:null,ox:0,oy:0,mag:0,ang:0,brake:false,front:false,rear:false,mine:false};
-const isTouch=()=>!!(window.matchMedia&&window.matchMedia('(pointer:coarse)').matches);
+const mq=q=>!!(window.matchMedia&&window.matchMedia(q).matches);
+let touchMode=mq('(pointer:coarse)')||mq('(any-pointer:coarse)')&&mq('(hover:none)')||(navigator.maxTouchPoints>0&&!mq('(pointer:fine)'))||('ontouchstart' in window&&!mq('(pointer:fine)'));
+const isTouch=()=>touchMode;
+function setTouchMode(on){
+ touchMode=on; document.documentElement.classList.toggle('touchmode',on);
+ if(G.mode==='race'&&!G.paused&&R&&!R.done){G.touch=on&&G.players===1; setTouch(true)}
+}
+setTouchMode(touchMode);
+addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&!touchMode)setTouchMode(true); else if(e.pointerType==='mouse'&&touchMode)setTouchMode(false)},true);
+addEventListener('touchstart',()=>{if(!touchMode)setTouchMode(true)},{capture:true,passive:true});
 function touchInput(c){
  const fwd=c.vx*Math.cos(c.a)+c.vy*Math.sin(c.a);
  let up=true,down=false,steer=0;
@@ -984,8 +991,7 @@ function goFull(){
   if(r&&r.then)r.then(lock).catch(()=>{}); else lock();}catch(_){}
 }
 function setTouch(on){
- const coarse=window.matchMedia&&window.matchMedia('(pointer:coarse)').matches;
- touchEl.classList.toggle('on',!!(on&&coarse));
+ touchEl.classList.toggle('on',!!(on&&touchMode&&G.players===1));
 }
 function showOv(html){
  const old=ov.querySelector('.panel'),sc=old?old.scrollTop:0;
