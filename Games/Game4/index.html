@@ -79,8 +79,11 @@ tr.me td{color:var(--orange);font-weight:700}
 #touch{position:absolute;inset:0;display:none;pointer-events:none;z-index:2}
 #touch.on{display:block}
 #stickZone{position:absolute;left:0;top:0;bottom:0;width:55%;pointer-events:auto;touch-action:none}
-#stickBase{position:absolute;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;border:2px solid rgba(255,255,255,.55);background:rgba(0,26,68,.3);display:none;pointer-events:none}
+#stickBase{position:absolute;width:146px;height:60px;margin:-30px 0 0 -73px;border-radius:30px;border:2px solid rgba(255,255,255,.55);background:rgba(0,26,68,.3);display:none;pointer-events:none}
 #stickKnob{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(255,255,255,.6);border:2px solid #000}
+#stickBase::before,#stickBase::after{position:absolute;top:50%;transform:translateY(-50%);font:12px "Press Start 2P",monospace;color:rgba(255,255,255,.6)}
+#stickBase::before{content:"‹";left:8px}
+#stickBase::after{content:"›";right:8px}
 #stickHint{position:absolute;left:4%;bottom:6%;font:8px "Press Start 2P",monospace;color:rgba(255,255,255,.55);pointer-events:none;text-shadow:1px 1px 0 #000}
 #tbtns{position:absolute;right:max(10px,env(safe-area-inset-right,0px));bottom:10px;display:grid;grid-template-columns:repeat(2,auto);gap:10px;pointer-events:auto;align-items:end}
 #tbtns button,#pauseBtn{border-radius:50%;padding:0;opacity:.6;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -113,7 +116,7 @@ html.touchmode .copper{height:26px;margin:-10px -12px 8px}
   <div id="touch" aria-hidden="true">
     <div id="stickZone"></div>
     <div id="stickBase"><div id="stickKnob"></div></div>
-    <div id="stickHint">Ohjaa vetämällä</div>
+    <div id="stickHint">Ohjaa liu'uttamalla sivuttain</div>
     <button id="pauseBtn" type="button">II</button>
     <div id="tbtns">
       <button data-w="rear">TAKA</button><button data-w="front" class="big">ETU</button>
@@ -466,7 +469,7 @@ function makeCar(d,slot,T,demo){
 }
 const topSpeed=c=>(3.0+0.33*c.engine)*(1-c.damage/260)*((c.human&&!c.finished)?1:c.ai.skill);
 
-const TS={id:null,ox:0,oy:0,mag:0,ang:0,brake:false,front:false,rear:false,mine:false};
+const TS={sx:0,bx:0,by:0,id:null,ox:0,oy:0,mag:0,ang:0,brake:false,front:false,rear:false,mine:false};
 const mq=q=>!!(window.matchMedia&&window.matchMedia(q).matches);
 let touchMode=mq('(pointer:coarse)')||mq('(any-pointer:coarse)')&&mq('(hover:none)')||(navigator.maxTouchPoints>0&&!mq('(pointer:fine)'))||('ontouchstart' in window&&!mq('(pointer:fine)'));
 const isTouch=()=>touchMode;
@@ -480,13 +483,7 @@ addEventListener('touchstart',()=>{if(!touchMode)setTouchMode(true)},{capture:tr
 function touchInput(c){
  const fwd=c.vx*Math.cos(c.a)+c.vy*Math.sin(c.a);
  let up=true,down=false,steer=0;
- if(TS.id!=null&&TS.mag>0.25){
-  const diff=angN(TS.ang-c.a);
-  if(Math.abs(diff)>2.3){
-   up=false; down=true;
-   if(fwd<0.3)steer=-clamp(angN(TS.ang-(c.a+Math.PI))*2.5,-1,1);
-  } else steer=clamp(diff*2.5,-1,1);
- }
+ if(TS.id!=null&&Math.abs(TS.sx)>0.1)steer=clamp((Math.abs(TS.sx)-0.1)/0.9,0,1)*Math.sign(TS.sx);
  if(TS.brake){up=false; down=true}
  return {up,down,steer,front:TS.front,rear:TS.rear,mine:TS.mine};
 }
@@ -1014,7 +1011,7 @@ function showMenu(){
   <div><b>Pelaaja 1</b><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ajo<br><kbd>F</kbd> etuohjus, <kbd>G</kbd> takaohjus<br><kbd>H</kbd> miina</div>
   <div><b>Pelaaja 2</b>nuolinäppäimet ajo<br><kbd>,</kbd> etuohjus, <kbd>.</kbd> takaohjus<br><kbd>-</kbd> miina</div>
  </div>
- <p class="touchonly sub" style="font-size:13px">Kaasu on päällä automaattisesti. Vedä peukaloa ruudun vasemmalla puolella siihen suuntaan, johon haluat ajaa. Vetämällä auton takasuuntaan jarrutat ja peruutat. Oikealla ovat aseet ja jarru, ylhäällä tauko.</p>
+ <p class="touchonly sub" style="font-size:13px">Kaasu on päällä automaattisesti. Ohjaa liu'uttamalla peukaloa vasemmalle tai oikealle ruudun vasemmalla puolella. JARRU hidastaa, ja kun pidät sitä pohjassa auton pysähdyttyä, auto peruuttaa. Oikealla ovat aseet ja jarru, ylhäällä tauko.</p>
  <p class="tiny">Kausi on ${SEASON} kisaa. Pisteet 10, 7, 5, 4, 3, 2 ja 1. Voita mestaruus, niin nouset kovempaan divisioonaan.<span class="kbonly"> <kbd>P</kbd> tauko, <kbd>M</kbd> ääni.</span></p>
  </div>`);
 }
@@ -1112,21 +1109,22 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>{keys[e.code]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false; if(G.mode==='race'&&!G.paused&&R&&!R.done){G.paused=true; showPause()}});
 const stickZone=document.getElementById('stickZone'),stickBase=document.getElementById('stickBase'),stickKnob=document.getElementById('stickKnob'),stickHint=document.getElementById('stickHint'),stageEl=document.getElementById('stage');
-function resetTouch(){TS.id=null; TS.mag=0; TS.brake=TS.front=TS.rear=TS.mine=false; stickBase.style.display='none'; for(const b of touchEl.querySelectorAll('[data-w]'))b.classList.remove('on')}
+function resetTouch(){TS.id=null; TS.mag=0; TS.sx=0; TS.brake=TS.front=TS.rear=TS.mine=false; stickBase.style.display='none'; for(const b of touchEl.querySelectorAll('[data-w]'))b.classList.remove('on')}
 stickZone.addEventListener('pointerdown',e=>{
  if(TS.id!=null)return; e.preventDefault(); const r=stageEl.getBoundingClientRect();
  TS.id=e.pointerId; TS.ox=e.clientX-r.left; TS.oy=e.clientY-r.top; TS.mag=0;
- stickBase.style.left=TS.ox+'px'; stickBase.style.top=TS.oy+'px'; stickBase.style.display='block'; stickKnob.style.transform='';
+ TS.sx=0; TS.bx=clamp(TS.ox,77,Math.max(77,r.width*0.55-77)); TS.by=clamp(TS.oy,34,r.height-34);
+ stickBase.style.left=TS.bx+'px'; stickBase.style.top=TS.by+'px'; stickBase.style.display='block'; stickKnob.style.transform='translate('+(TS.ox-TS.bx)+'px,'+(TS.oy-TS.by)+'px)';
  stickHint.style.display='none';
  try{stickZone.setPointerCapture(e.pointerId)}catch(_){}
 });
 stickZone.addEventListener('pointermove',e=>{
  if(e.pointerId!==TS.id)return; const r=stageEl.getBoundingClientRect();
- const dx=e.clientX-r.left-TS.ox,dy=e.clientY-r.top-TS.oy,len=Math.hypot(dx,dy),R0=50,k=len>R0?R0/len:1;
- TS.mag=Math.min(1,len/R0); TS.ang=Math.atan2(dy,dx);
- stickKnob.style.transform='translate('+(dx*k)+'px,'+(dy*k)+'px)';
+ const dx=e.clientX-r.left-TS.ox,R0=46,kx=clamp(dx,-R0,R0);
+ TS.sx=kx/R0;
+ stickKnob.style.transform='translate('+(TS.ox-TS.bx+kx)+'px,'+(TS.oy-TS.by)+'px)';
 });
-for(const ev of ['pointerup','pointercancel','lostpointercapture'])stickZone.addEventListener(ev,e=>{if(e.pointerId!==TS.id)return; TS.id=null; TS.mag=0; stickBase.style.display='none'});
+for(const ev of ['pointerup','pointercancel','lostpointercapture'])stickZone.addEventListener(ev,e=>{if(e.pointerId!==TS.id)return; TS.id=null; TS.mag=0; TS.sx=0; stickBase.style.display='none'});
 for(const b of touchEl.querySelectorAll('[data-w]')){
  const w=b.dataset.w;
  b.addEventListener('pointerdown',e=>{e.preventDefault(); TS[w]=true; b.classList.add('on'); try{b.setPointerCapture(e.pointerId)}catch(_){}});
