@@ -577,7 +577,7 @@ function loadLevel(){
   banner=120; state='play';
 }
 function placePlayer(pos){
-  Object.assign(player,{x:pos.x,y:pos.y,vx:0,vy:0,ground:false,spin:0,inv:90});
+  Object.assign(player,{x:pos.x,y:pos.y,vx:0,vy:0,ground:false,spin:0,inv:150});
   curSX=Math.floor((player.x+player.w/2)/VW); curSY=Math.floor((player.y+player.h/2)/VH); dark=false;
 }
 function newGame(){ score=0; lives=4; levelIdx=Math.min(startSel,unlocked); loop=0; nextLife=20000; loadLevel(); }
@@ -698,8 +698,9 @@ function update(){
   updateEnemies(); updateParticles();
 
   // hazards
-  if(boxAny(p,1,c=>c==='L')) { die(); return; }
-  if(boxAny(p,0,c=>c==='~')) { die(); return; }
+  const envSafe = p.inv>30; // first 2 s of the 2.5 s protection also covers lava and water
+  if(!envSafe && boxAny(p,1,c=>c==='L')) { die(); return; }
+  if(!envSafe && boxAny(p,0,c=>c==='~')) { die(); return; }
   if(p.inv<=0 && enemies.some(e=>e.alive && overlap(p,e,2))) { die(); return; }
   if(!dark && boxAny(p,0,c=>c==='K')){ dark=true; beep(200,0.3,'triangle',0.06,-150); }
 

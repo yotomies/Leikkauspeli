@@ -36,7 +36,7 @@ button{font:inherit;color:inherit}
 .btn.primary:active{border-color:#8a4600 #ffd199 #ffd199 #8a4600}
 
 /* HUD */
-#hud{position:fixed;inset:0;pointer-events:none;font-family:var(--ui)}
+#hud{position:fixed;inset:0;z-index:6;pointer-events:none;font-family:var(--ui)}
 #hud .panel{position:absolute;padding:8px 12px}
 .lbl{font-size:12px;color:var(--muted);letter-spacing:.02em}
 .big{font-family:var(--pixel);font-size:26px;line-height:1}
@@ -56,7 +56,7 @@ button{font:inherit;color:inherit}
 #msg{position:absolute;left:50%;top:26%;transform:translateX(-50%);font-family:var(--pixel);font-size:clamp(14px,2.6vw,22px);text-align:center;text-shadow:3px 3px 0 #000;white-space:nowrap;transition:opacity .25s}
 #msg.good{color:var(--good)} #msg.bad{color:var(--bad)} #msg.info{color:var(--wb-orange)}
 #count{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-family:var(--pixel);font-size:clamp(60px,14vw,140px);color:var(--wb-orange);text-shadow:6px 6px 0 #000}
-#hudBtns{position:absolute;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;pointer-events:auto}
+#hudBtns{position:absolute;z-index:30;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;pointer-events:auto}
 #hudBtns .btn{padding:.4em .6em;font-size:16px}
 
 /* Kosketusohjaimet */
@@ -65,12 +65,13 @@ body.touch #touch.on{display:block}
 #steerZone{position:absolute;left:0;bottom:0;width:48vw;height:62vh;pointer-events:auto;touch-action:none}
 #stickBase{position:absolute;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;border:3px solid rgba(255,255,255,.55);background:rgba(0,85,170,.28);display:none}
 #stickKnob{position:absolute;left:50%;top:50%;width:66px;height:66px;margin:-33px 0 0 -33px;border-radius:50%;background:var(--wb-orange);border:3px solid #fff;box-shadow:0 3px 0 rgba(0,0,0,.4)}
-.tzHint{position:absolute;left:calc(18px + env(safe-area-inset-left,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));font-family:var(--pixel);font-size:11px;color:rgba(255,255,255,.75);text-shadow:2px 2px 0 #000;transition:opacity .4s}
+.tzHint{position:absolute;left:calc(92px + env(safe-area-inset-left,0px));bottom:calc(36px + env(safe-area-inset-bottom,0px));font-family:var(--pixel);font-size:11px;color:rgba(255,255,255,.75);text-shadow:2px 2px 0 #000;transition:opacity .4s}
 #steerZone.used .tzHint{opacity:0}
 .tb{position:absolute;pointer-events:auto;background:rgba(0,85,170,.6);border:3px solid;border-color:var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);font-family:var(--pixel);font-size:13px;display:grid;place-items:center;touch-action:none;color:#fff;border-radius:50%;-webkit-tap-highlight-color:transparent}
 .tb.on{background:rgba(255,136,0,.85);transform:scale(.95)}
 .tb[data-k="gas"]{right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));width:112px;height:112px;font-size:15px}
 .tb[data-k="brake"]{right:calc(146px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));width:84px;height:84px}
+.tb[data-k="cam"]{left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:64px;height:64px;font-size:9px;line-height:1.3;text-align:center}
 .tb[data-k="boost"]{right:calc(40px + env(safe-area-inset-right,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px));width:76px;height:76px;font-size:11px}
 body.touch.autogas .tb[data-k="gas"]{opacity:.45}
 body.touch #bl{bottom:auto;top:calc(118px + env(safe-area-inset-top,0px));min-width:0;padding:6px 10px}
@@ -107,7 +108,7 @@ body{-webkit-touch-callout:none}
 @media (max-width:560px){ .vs{grid-template-columns:1fr} .ctable{font-size:13px} }
 
 /* Näytöt */
-.screen{position:fixed;inset:0;display:grid;place-items:center;padding:16px;overflow:auto;background:linear-gradient(180deg,rgba(0,0,34,.15),rgba(0,0,34,.55))}
+.screen{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px;overflow:auto;background:linear-gradient(180deg,rgba(0,0,34,.15),rgba(0,0,34,.55))}
 .window{width:min(860px,100%);padding:0}
 .titlebar{display:flex;align-items:center;gap:10px;background:var(--wb-white);color:var(--wb-blue);padding:4px 8px;font-family:var(--pixel);font-size:13px}
 .titlebar .gad{width:14px;height:14px;border:2px solid var(--wb-blue);background:var(--wb-white)}
@@ -151,6 +152,16 @@ kbd{font-family:var(--pixel);font-size:11px;background:var(--wb-grey);color:var(
 #hudBtns .btn[aria-pressed="true"]{background:var(--wb-orange)}
 @media (max-width:560px){ .gauge{min-width:64px;padding:4px 8px} .gauge.wide{min-width:90px} #hud.cockpit #tc{opacity:0} }
 
+
+/* Alkuvalikko 30 % läpinäkyvämpi, jotta taustan rata näkyy */
+:root{--panel-menu:rgba(0,40,92,.6)}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){ --panel-menu:rgba(0,85,170,.63); } }
+:root[data-theme="light"]{--panel-menu:rgba(0,85,170,.63)}
+#menu{background:linear-gradient(180deg,rgba(0,0,34,.1),rgba(0,0,34,.385))}
+#menu .window{background:var(--panel-menu)}
+#menu .tcard{background:rgba(0,26,58,.42)}
+#menu .tcard[aria-pressed="true"]{background:rgba(255,136,0,.13)}
+#menu .sub,#menu .keys,#menu .tcard p,#menu .tcard .meta{text-shadow:0 1px 2px rgba(0,0,0,.7)}
 </style>
 </head>
 <body>
@@ -181,6 +192,7 @@ kbd{font-family:var(--pixel);font-size:11px;background:var(--wb-grey);color:var(
 
 <div id="touch">
   <div id="steerZone" aria-label="Ohjausalue: liu'uta sormea vasemmalle tai oikealle"><div id="stickBase"><div id="stickKnob"></div></div><div class="tzHint">◀ Ohjaa liu'uttamalla ▶</div></div>
+  <div class="tb" data-k="cam" aria-label="Vaihda kuvakulma">🎥<br>Näkymä</div>
   <div class="tb" data-k="boost">Turbo</div>
   <div class="tb" data-k="brake">Jarru</div>
   <div class="tb" data-k="gas">Kaasu</div>
@@ -239,7 +251,7 @@ kbd{font-family:var(--pixel);font-size:11px;background:var(--wb-grey);color:var(
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 // ===================== CORE: radat, fysiikka, tekoäly =====================
-const G = 10, GRIP = 17, LAPS = 3, POPG = 2.2, AIRSTEER = 0.5;
+const G = 10, GRIP = 17, LAPS = 3, POPG = 2.8, AIRSTEER = 0.5;
 let HALF = 6;
 let TT = 0; // ratakello (nostosillat)
 const HOOKS = { msg() {}, thud() {}, crack() {}, fall() {}, wreck() {}, lap() {} };
@@ -272,6 +284,27 @@ function roundedRectPts(w, h, r) {
 }
 function limaconPts(a, b, n, sc) { const p = []; for (let k = 0; k < n; k++) { const t = 2 * Math.PI * k / n, r = b + a * Math.cos(t); p.push([sc * r * Math.cos(t), sc * r * Math.sin(t)]); } return p; }
 function flowerPts(R0, A, n, pts, ph) { const p = []; for (let k = 0; k < pts; k++) { const t = 2 * Math.PI * k / pts, r = R0 + A * Math.sin(n * t + ph); p.push([r * Math.sin(t), -r * Math.cos(t)]); } return p; }
+function paramPts(fn, n) { const p = []; for (let k = 0; k < n; k++) p.push(fn(2 * Math.PI * k / n)); return p; }
+function knotPts(sc, k, a, n) { return paramPts(t => [sc * (Math.sin(t) + a * Math.sin(k * t)), sc * (Math.cos(t) - a * Math.cos(k * t))], n); }
+// reitti suorista ja kaarista: ['S', pituus] tai ['A', säde, astetta (+ = vasemmalle)]
+function pathPts(x, z, hdDeg, segs, step) {
+  step = step || 25; const p = []; let a = hdDeg * Math.PI / 180;
+  for (const sg of segs) {
+    if (sg[0] === 'S') { const n = Math.max(1, Math.round(sg[1] / step)); for (let i = 0; i < n; i++) { p.push([x, z]); x += Math.cos(a) * sg[1] / n; z += Math.sin(a) * sg[1] / n; } }
+    else { const R = sg[1], da = sg[2] * Math.PI / 180, n = Math.max(2, Math.round(R * Math.abs(da) / step)); for (let i = 0; i < n; i++) { p.push([x, z]); const d = da / n, ch = 2 * R * Math.sin(Math.abs(d) / 2); a += d / 2; x += Math.cos(a) * ch; z += Math.sin(a) * ch; a += d / 2; } }
+  }
+  return p;
+}
+// seinämän mitat (vaakaeteneminen adv ja korkeusmuutos Y) ratasuunnittelua varten
+function wallGeom(pieces) {
+  const Ls = pieces.reduce((a, p) => a + p[0], 0), n = Math.ceil(Ls / 0.5);
+  const thAt = r => { let th0 = 0, acc = 0; for (const [len, th1] of pieces) { if (r <= acc + len) return th0 + (th1 - th0) * (r - acc) / len; acc += len; th0 = th1; } return th0; };
+  let x = 0, y = 0, prev = 0;
+  for (let i = 1; i <= n; i++) { const th = thAt(i * Ls / n), tm = (prev + th) / 2, dr = Ls / n; x += Math.cos(tm) * dr; y += Math.sin(tm) * dr; prev = th; }
+  return { adv: x, Y: y };
+}
+// liikkuvan nostosillan alastulorinteen profiilisolmut (suhteessa sillan tasoon h)
+function leafLanding(at, h) { const E = at + 64; return [[at - 5, h], [at, h], [E, h - 2], [E + 30, h - 8], [E + 60, h - 17], [E + 90, h - 24], [E + 110, h - 26]]; }
 function lemniPts(A, B, n, off) { const p = []; for (let k = 0; k < n; k++) { const t = off + 2 * Math.PI * k / n; p.push([A * Math.sin(t), B * Math.sin(t) * Math.cos(t)]); } return p; }
 
 const TRACKS = [
@@ -280,22 +313,22 @@ const TRACKS = [
     desc: 'Leveä soikio harjoitteluun: pystysilmukka heti lähdön jälkeen, iso mäki, syvä notko ja töyssyjä.',
     pts: ellipsePts(320, 200, 16),
     feats: (L) => [
-      { t: 'vloop', at: 90, R: 12 }, { t: 'hill', u: .19, len: 220, h: 10 }, { t: 'hill', u: .40, len: 50, h: 2.4 },
+      { t: 'vloop', at: 90, R: 12 }, { t: 'hill', u: .19, len: 220, h: 10 }, { t: 'hill', u: .40, len: 100, h: 2.2 },
       { t: 'hill', u: .60, len: 200, h: -7 }, { t: 'roll', u: .83, len: 140, h: 2, n: 3 }] },
-  { name: 'Hyppyrimäki', stars: 2, base: 12,
-    desc: 'Pudotushyppy korkealta tasanteelta, pystysilmukka ja pitkä aukko takasuoralla.',
-    pts: stadiumPts(600, 120),
+  { name: 'Kolmoisloikka', key: 'kolmoisloikka', stars: 2, base: 12,
+    desc: 'Hyppyjen rata: kaksoishyppy kahden aukon yli, pudotushyppy 22 metrin tornista, korkkiruuvi, pystysilmukka ja kumpareita.',
+    pts: roundedRectPts(900, 380, 100),
     feats: (L) => [
-      { t: 'mesa', at: 300, up: 100, flat: 80, down: 180, h: 10 }, { t: 'jump', at: 340, up: 40, gap: 18, down: 70, h: 3, minV: 28 },
-      { t: 'hill', at: 790, len: 160, h: 8 }, { t: 'vloop', at: 1080, R: 15 },
-      { t: 'jump', at: 1330, up: 44, gap: 24, down: 80, h: 3.5, minV: 32 }, { t: 'roll', at: 1760, len: 150, h: 2, n: 4 }] },
-  { name: 'Vuoristorata', stars: 3, base: 14,
-    desc: 'Aaltoja, 18 metrin huippu josta lennetään, kymmenen metrin notko ja silmukka ennen maalia.',
-    pts: [[0, -200], [200, -220], [330, -100], [300, 80], [170, 120], [90, 220], [-80, 250], [-260, 170], [-300, 0], [-220, -150]],
+      { t: 'jump', at: 160, up: 30, gap: 14, down: 40, h: 2.6, minV: 27 }, { t: 'jump', at: 290, up: 34, gap: 16, down: 50, h: 3, minV: 29 },
+      { t: 'hill', at: 520, len: 60, h: 2.6 }, { t: 'cork', at: 870, len: 110, R: 6 }, { t: 'hill', at: 1115, len: 140, h: 5 },
+      { t: 'mesa', at: 1480, up: 130, flat: 60, down: 250, h: 22 }, { t: 'jump', at: 1510, up: 35, gap: 20, down: 80, h: 3, minV: 30 },
+      { t: 'vloop', at: 1775, R: 15 }, { t: 'roll', at: 2140, len: 120, h: 1.6, n: 3 }] },
+  { name: 'Korkea hyppy', key: 'korkeahyppy', stars: 3, base: 16,
+    desc: 'Pitkällä suoralla 68 metrin aukko: yli pääsee vain yli 200 km/h vauhdilla, joten säästä turboa. Kulmikas takasuora kannattaa ajaa noin 180 km/h, muu rata täysillä.',
+    pts: pathPts(-450, -150, 0, [['S', 900], ['A', 150, 166.25], ['S', 465.8], ['A', 140, 27.5], ['S', 465.8], ['A', 150, 166.25]]),
     feats: (L) => [
-      { t: 'jump', at: 70, up: 30, gap: 14, down: 60, h: 2.4, minV: 27 }, { t: 'roll', u: .16, len: 200, h: 2.4, n: 5 },
-      { t: 'hill', u: .35, len: 220, h: 18 }, { t: 'hill', u: .55, len: 160, h: -10 }, { t: 'hill', u: .72, len: 60, h: 3 },
-      { t: 'roll', u: .88, len: 120, h: 2.2, n: 3 }, { t: 'vloop', at: L - 110, R: 13 }] },
+      { t: 'jump', at: 560, up: 60, gap: 68, down: 150, h: 4, minV: 57 },
+      { t: 'hill', at: 1120, len: 300, h: 6 }, { t: 'hill', at: 2550, len: 300, h: -5 }] },
   { name: 'Kahdeksikko', cross: true, stars: 3, base: 10,
     desc: 'Silta, alikulku, hyppy juuri ennen alikulkua ja pystysilmukka sen jälkeen.',
     pts: lemniPts(380, 300, 20, 0.25),
@@ -309,12 +342,14 @@ const TRACKS = [
     feats: (L) => [
       { t: 'mesa', at: -210, up: 160, flat: 480, down: 170, h: 22 }, { t: 'jump', at: 1750, up: 28, gap: 14, down: 50, h: 2.6, minV: 27 },
       { t: 'hill', u: .40, len: 140, h: -5 }, { t: 'roll', u: .5, len: 160, h: 2.5, n: 4 }, { t: 'hill', u: .66, len: 120, h: 6 }] },
-  { set: 2, name: 'Mutkamutka', stars: 2, base: 12,
-    desc: 'Kaarre kaarteen perään ja samalla ylös ja alas: iso mäki, syvä notko ja korkea tasanne.',
-    pts: flowerPts(330, 58, 5, 40, 0),
+  { set: 2, name: 'Nostosilta', key: 'nostosilta2', stars: 3, base: 44,
+    desc: 'Radan kohokohta on jättimäinen nostosilta, joka liikkuu koko ajan ylös ja alas. Matalalta sillalta tarvitaan kova vauhti (noin 150–170 km/h), korkealta selvästi hiljempaa (noin 100–115 km/h). Lisäksi 66 metrin nousu ja jyrkkä pudotus.',
+    pts: stadiumPts(1100, 140),
     feats: (L) => [
-      { t: 'hill', u: .2, len: 160, h: 10 }, { t: 'roll', u: .42, len: 120, h: 1.8, n: 3 }, { t: 'hill', u: .6, len: 160, h: -8 },
-      { t: 'mesa', u: .84, up: 80, flat: 60, down: 80, h: 8 }] },
+      { t: 'prof', smooth: true, pts: [[0, 0], [375, 0], [444, -2], [474, -8], [504, -17], [534, -24], [554, -26], [650, -26], [1300, 40], [1720, 40], [1813, -10.3], [2050, -10], [2900, -6], [L - 40, 0]] },
+      { t: 'bridge', at: 380, len: 64, leaf: 30, sine: true, amin: 0.07, amax: 0.245, period: 10 },
+      { t: 'wall', at: 1720, segs: [[70, -0.95], [5, -0.95], [35, 0]], abs: true, aiV: 32 },
+      { t: 'roll', at: 1960, len: 140, h: 1.1, n: 4 }, { t: 'vloop', at: 2250, R: 16 }] },
   { set: 2, name: 'Kahjo kaarre', stars: 2, base: 12,
     desc: 'Pitkä hyppy heti lähdön jälkeen, kallistetut päädyt, pystysilmukka ja mäki josta lennetään.',
     pts: stadiumPts(700, 90),
@@ -328,71 +363,201 @@ const TRACKS = [
     feats: (L, c) => [
       { t: 'mesa', at: c[0], up: 80, flat: 50, down: 80, h: 14 }, { t: 'jump', at: c[1] - 100, up: 34, gap: 16, down: 60, h: 2.8, minV: 28 },
       { t: 'vloop', at: c[1] + 70, R: 14 }, { t: 'roll', at: c[0] + 0.25 * L, len: 140, h: 1.5, n: 4 }, { t: 'hill', at: c[1] + 0.2 * L, len: 160, h: 10 }] },
-  { set: 2, name: 'Nykivä nousu', stars: 3, base: 12,
-    desc: 'Kaksi hyppyä peräkkäin, pudotushyppy tasanteelta ja syvä notko ennen maalia.',
-    pts: roundedRectPts(800, 360, 90),
-    feats: (L) => [
-      { t: 'jump', at: 220, up: 34, gap: 14, down: 55, h: 2.8, minV: 27 }, { t: 'jump', at: 470, up: 34, gap: 16, down: 55, h: 3.2, minV: 28 },
-      { t: 'hill', at: 850, len: 110, h: 5 }, { t: 'mesa', at: 1260, up: 80, flat: 60, down: 170, h: 9 },
-      { t: 'jump', at: 1290, up: 36, gap: 18, down: 60, h: 3.2, minV: 29 }, { t: 'roll', at: 1550, len: 120, h: 2, n: 3 },
-      { t: 'hill', at: 1930, len: 140, h: -8 }] },
+  { set: 2, name: 'Vuoristorata', key: 'jattivuoristorata', cross: true, stars: 3, laps: 2, base: 20, bankK: 100, bankMax: 1.0,
+    desc: 'Neliapilan muotoinen jättivuoristorata: jyrkästi kallistetut kaarteet 75 metrin korkeudessa, 70 metrin syöksyt notkoihin ja kahdeksan risteystä, joissa rata kulkee itsensä yli ja ali.',
+    pts: paramPts(t => [158 * (Math.sin(t) + 1.5 * Math.sin(-3 * t)), 158 * (Math.cos(t) + 1.5 * Math.cos(-3 * t))], 52),
+    feats: (L, c, X) => [
+      crossProfile(X, 24, [[0, 55], [1128, 55], [2259, 55], [3389, 55], [200, -15], [928, -15], [1328, -15], [2059, -15], [2459, -15], [3189, -15], [3589, -15], [4320, -15]])] },
   { set: 2, name: 'Ilkeä isku', stars: 3, base: 18, half: 5,
     desc: 'Kapein ja korkein rata: 32 metrin huippu, 12 metrin pudotus, pitkä aukko ja korkea tasanne.',
     pts: flowerPts(360, 110, 3, 36, 0.4),
     feats: (L) => [
       { t: 'hill', u: .12, len: 180, h: 14 }, { t: 'hill', u: .30, len: 160, h: -12 }, { t: 'roll', at: 1000, len: 180, h: 1.7, n: 5 },
-      { t: 'hill', at: 1380, len: 80, h: 4 }, { t: 'jump', at: 1640, up: 30, gap: 20, down: 60, h: 3.5, minV: 30 },
-      { t: 'mesa', u: .82, up: 70, flat: 40, down: 60, h: 10 }] },
+      { t: 'hill', at: 1380, len: 150, h: 4 }, { t: 'jump', at: 1640, up: 30, gap: 18, down: 60, h: 2.4, minV: 31 },
+      { t: 'mesa', u: .82, up: 130, flat: 40, down: 110, h: 10 }] },
   { set: 2, name: 'Kiusan kierre', cross: true, stars: 3, base: 10,
     desc: 'Rata kiertää silmukan oman itsensä ylitse. Töyssy lähdön jälkeen ja tiukka sisäkaarre sillan jälkeen.',
     pts: limaconPts(315, 165, 28, 1),
     feats: (L, c) => [
-      { t: 'hill', at: 90, len: 70, h: 3 }, { t: 'mesa', at: c[0], up: 70, flat: 40, down: 70, h: 13 },
+      { t: 'hill', at: 90, len: 130, h: 3 }, { t: 'mesa', at: c[0], up: 110, flat: 40, down: 140, h: 13 },
       { t: 'roll', at: c[0] + 0.3 * L, len: 140, h: 2, n: 3 }, { t: 'hill', at: c[1] + 0.25 * L, len: 160, h: 8 }] },
-  { set: 2, name: 'Rottarallit', stars: 1, base: 9, laps: 5,
-    desc: 'Lyhyt ja nopea soikio, viisi kierrosta. Pieni pystysilmukka toisella suoralla.',
-    pts: ellipsePts(260, 130, 16),
-    feats: (L) => [{ t: 'roll', u: .25, len: 100, h: 2, n: 3 }, { t: 'vloop', u: .5, R: 11 }, { t: 'hill', u: .75, len: 80, h: 4 }] },
+  { set: 2, name: 'Mäkihyppy', key: 'makihyppy', stars: 2, base: 84,
+    desc: 'Nousu 130 metrin tasanteelle, jyrkkenevä pudotus ja ponnistus mäkihyppyyn. Tule tasanteen reunalle noin 85–110 km/h: liian hitaasti putoat aukkoon, liian kovaa auto irtoaa pudotuksen reunalta.',
+    pts: stadiumPts(1200, 120),
+    feats: (L) => { const S = [[57, -1.05], [8, -1.05], [34, 0.21]], g = wallGeom(S), lip = 540 + g.adv, lr = 48 + g.Y, GAP = 60;
+      const land = [[0, -4], [15, -10], [35, -18], [60, -30], [85, -43], [110, -55], [135, -63], [160, -68], [185, -70], [215, -70]].map(([x, h]) => [lip + GAP + x * 1.15, lr + h * 1.15]);
+      return [
+      { t: 'prof', smooth: true, pts: [[0, 0], [100, 0], [460, 48], [540, 48], [lip, lr], ...land, [land[land.length - 1][0] + 30, land[land.length - 1][1]], [L - 200, 0]] },
+      { t: 'wall', at: 540, segs: S, abs: true, aiV: 27 },
+      { t: 'jump', at: lip, up: 0.01, gap: GAP, down: 0.01, h: 0, minV: 0 },
+      { t: 'vloop', at: 1750, R: 15 }, { t: 'roll', at: 2300, len: 140, h: 2, n: 3 }, { t: 'hill', at: 2600, len: 100, h: 4 }]; } },
   // ---- sarja 3: villit radat ----
-  { set: 3, name: 'Nostosilta', stars: 2, base: 14,
+  { set: 3, name: 'Kääntösilta', stars: 2, base: 18, half: 5.5,
     desc: 'Nostosilta aukeaa ja sulkeutuu. Ajoita tulo niin, että silta on alhaalla, tai lennä aukon yli.',
     pts: stadiumPts(700, 110),
     feats: (L) => [
-      { t: 'hill', at: 170, len: 120, h: 5 }, { t: 'bridge', at: 400, len: 50, amax: 0.5, period: 14, phase: 0 },
-      { t: 'roll', at: 580, len: 100, h: 2, n: 2 }, { t: 'hill', at: 870, len: 160, h: 10 }, { t: 'vloop', at: 1120, R: 15 },
-      { t: 'jump', at: 1450, up: 40, gap: 22, down: 75, h: 3.5, minV: 31 }, { t: 'hill', at: 1920, len: 160, h: -8 }] },
-  { set: 3, name: 'Korkkiruuvi', stars: 2, base: 14,
+      { t: 'hill', at: 170, len: 120, h: 8 }, { t: 'bridge', at: 400, len: 54, amax: 0.6, period: 12, phase: 0 },
+      { t: 'roll', at: 580, len: 100, h: 2.6, n: 2 }, { t: 'hill', at: 870, len: 200, h: 16 }, { t: 'vloop', at: 1120, R: 17 },
+      { t: 'jump', at: 1450, up: 44, gap: 28, down: 85, h: 4, minV: 34 }, { t: 'hill', at: 1920, len: 200, h: -13 }] },
+  { set: 3, name: 'Korkkiruuvi', stars: 2, base: 20, half: 5.5,
     desc: 'Kaksi korkkiruuvikierrettä, joissa auto pyörähtää katon kautta ympäri. Liian hitaasti – putoat.',
     pts: roundedRectPts(900, 380, 100),
     feats: (L) => [
-      { t: 'cork', at: 200, len: 110, R: 6 }, { t: 'hill', at: 470, len: 120, h: 6 }, { t: 'roll', at: 950, len: 120, h: 2, n: 3 },
-      { t: 'jump', at: 1300, up: 36, gap: 16, down: 60, h: 3, minV: 28 }, { t: 'cork', at: 1520, len: 120, R: 7 },
-      { t: 'hill', at: 1790, len: 120, h: -7 }, { t: 'hill', at: 2140, len: 100, h: 4 }] },
-  { set: 3, name: 'Villi vuoristo', stars: 3, base: 12,
+      { t: 'cork', at: 200, len: 130, R: 6 }, { t: 'hill', at: 470, len: 160, h: 12 }, { t: 'roll', at: 950, len: 120, h: 1.8, n: 3 },
+      { t: 'jump', at: 1300, up: 40, gap: 22, down: 70, h: 3.4, minV: 31 }, { t: 'cork', at: 1520, len: 140, R: 7 },
+      { t: 'hill', at: 1800, len: 260, h: -14 }, { t: 'hill', at: 2140, len: 180, h: 9 }] },
+  { set: 3, name: 'Villi vuoristo', stars: 3, base: 16, half: 5.5,
     desc: '42 metrin torni ja pudotushyppy sen huipulta, silmukka, korkkiruuvi, tuplasilmukka ja jättihyppy.',
     pts: stadiumPts(900, 120),
     feats: (L) => [
-      { t: 'mesa', at: 300, up: 200, flat: 120, down: 220, h: 30 }, { t: 'jump', at: 360, up: 40, gap: 20, down: 70, h: 3, minV: 28 },
-      { t: 'vloop', at: 640, R: 16 }, { t: 'roll', at: 800, len: 90, h: 2.5, n: 2 }, { t: 'hill', at: 1080, len: 200, h: 12 },
+      { t: 'mesa', at: 300, up: 200, flat: 120, down: 240, h: 45 }, { t: 'jump', at: 360, up: 40, gap: 26, down: 80, h: 3.2, minV: 30 },
+      { t: 'vloop', at: 640, R: 17 }, { t: 'roll', at: 800, len: 90, h: 3, n: 2 }, { t: 'hill', at: 1080, len: 240, h: 18 },
       { t: 'cork', at: 1340, len: 110, R: 6 }, { t: 'vloop', at: 1560, R: 13 }, { t: 'vloop', at: 1680, R: 13 },
-      { t: 'jump', at: 1900, up: 50, gap: 30, down: 90, h: 4.5, minV: 34 }, { t: 'hill', at: 2350, len: 180, h: -8 }] },
-  { set: 3, name: 'Kaaos', cross: true, stars: 3, base: 12,
+      { t: 'jump', at: 1900, up: 54, gap: 36, down: 100, h: 5, minV: 37 }, { t: 'hill', at: 2350, len: 220, h: -13 }] },
+  { set: 3, name: 'Kaaos', cross: true, stars: 3, base: 18, half: 5.5,
     desc: 'Kaikki samassa: silta oman radan yli, korkkiruuvi, nostosilta, pystysilmukka ja iso kumpare.',
     pts: lemniPts(460, 340, 24, 0.25),
     feats: (L, c) => [
-      { t: 'mesa', at: c[0], up: 85, flat: 50, down: 85, h: 16 }, { t: 'cork', at: c[0] + 160, len: 110, R: 6 },
-      { t: 'bridge', at: c[1] - 170, len: 44, amax: 0.45, period: 13, phase: 3 }, { t: 'vloop', at: c[1] + 80, R: 14 },
-      { t: 'roll', u: .25, len: 140, h: 2, n: 4 }, { t: 'hill', u: .62, len: 220, h: 9 }] },
-  { set: 3, name: 'Megahyppy', stars: 3, base: 16,
+      { t: 'mesa', at: c[0], up: 100, flat: 50, down: 100, h: 24 }, { t: 'cork', at: c[0] + 185, len: 125, R: 6 },
+      { t: 'bridge', at: c[1] - 170, len: 48, amax: 0.55, period: 12, phase: 3 }, { t: 'vloop', at: c[1] + 80, R: 16 },
+      { t: 'roll', u: .25, len: 140, h: 2.4, n: 4 }, { t: 'hill', u: .62, len: 260, h: 15 }] },
+  { set: 3, name: 'Megahyppy', stars: 3, base: 22, half: 5.5,
     desc: 'Lähdön jälkeen 45 metrin aukko – tarvitset täyden vauhdin ja turbon. Takasuoralla pudotushyppy ja silmukka.',
     pts: stadiumPts(800, 100),
     feats: (L) => [
-      { t: 'jump', at: 330, up: 70, gap: 45, down: 140, h: 8, minV: 40 }, { t: 'hill', at: 650, len: 100, h: 4 },
-      { t: 'roll', at: 950, len: 140, h: 2.5, n: 3 }, { t: 'mesa', at: 1350, up: 120, flat: 60, down: 200, h: 18 },
-      { t: 'jump', at: 1380, up: 35, gap: 25, down: 75, h: 3, minV: 30 }, { t: 'vloop', at: 1680, R: 17 },
-      { t: 'hill', at: 2070, len: 140, h: -10 }] },
+      { t: 'jump', at: 330, up: 70, gap: 55, down: 150, h: 8, minV: 44 }, { t: 'hill', at: 680, len: 100, h: 6 },
+      { t: 'roll', at: 950, len: 140, h: 1.8, n: 3 }, { t: 'mesa', at: 1350, up: 140, flat: 60, down: 260, h: 24 },
+      { t: 'jump', at: 1380, up: 35, gap: 30, down: 85, h: 3.2, minV: 32 }, { t: 'vloop', at: 1700, R: 18 },
+      { t: 'hill', at: 2070, len: 180, h: -16 }] },
+  // ---- sarja 1: lisäradat, joissa rata risteää itsensä kanssa eri tasoissa ----
+  { set: 1, name: 'Kolmoisapila', cross: true, stars: 2, base: 10,
+    desc: 'Apilanlehden muotoinen rata: kolme risteystä, joissa ajetaan vuorotellen sillan yli ja ali. Töyssyjä, hyppyrikumpu ja 24 metrin mäki.',
+    pts: knotPts(150, 2, 1.5, 36),
+    feats: (L, c, X) => [
+      crossProfile(X, 13, [[470, -4], [1450, 24], [2420, 17]]),
+      { t: 'hill', at: 185, len: 110, h: 2.2 },
+      { t: 'roll', at: 1290, len: 110, h: 1.6, n: 3 }, { t: 'roll', at: 2600, len: 110, h: 1.6, n: 3 }] },
+  { set: 1, name: 'Kiemurasilta', cross: true, stars: 2, laps: 2, base: 10,
+    desc: 'Pitkä kolmilehtinen rata, kolme siltaristeystä ja suorat täynnä temppuja: kaksi korkkiruuvia, kaksi silmukkaa, hyppy ja nostosilta.',
+    pts: paramPts(t => [200 * (Math.sin(t) + 1.6 * Math.sin(-2 * t)), 200 * (Math.cos(t) + 1.6 * Math.cos(-2 * t))], 40),
+    feats: (L, c, X) => [
+      crossProfile(X, 14, [[290, 6], [430, 6], [930, 3], [1080, 3], [1380, 22], [1640, 8], [1780, 8], [2740, -3], [3000, 5], [3080, 5], [3690, 4], [3830, 4], [4000, 18]]),
+      { t: 'cork', at: 305, len: 110, R: 6 }, { t: 'vloop', at: 950, R: 15 }, { t: 'cork', at: 1655, len: 110, R: 6 },
+      { t: 'jump', at: 2340, up: 34, gap: 18, down: 60, h: 2.2, minV: 30 }, { t: 'bridge', at: 3020, len: 44, amax: 0.45, period: 14, phase: 5 },
+      { t: 'vloop', at: 3705, R: 15 }, { t: 'roll', at: 2600, len: 120, h: 1.6, n: 3 }] },
+  { set: 1, name: 'Etanankuori', cross: true, stars: 2, base: 10,
+    desc: 'Kierteinen rata, joka kiertää itsensä ympäri ja ylittää oman alkupätkänsä korkealla sillalla. Kumpareita, silmukka ja 20 metrin mäki.',
+    pts: paramPts(t => { const r = 180 + 340 * Math.cos(t) + 60 * Math.cos(3 * t); return [r * Math.cos(t), r * Math.sin(t) * 1.1]; }, 40),
+    feats: (L, c, X) => [
+      crossProfile(X, 14, [[300, -4], [560, 4], [660, 4], [1250, 22], [1810, 3], [1950, 3], [2200, 9]]),
+      { t: 'hill', at: 600, len: 110, h: 2.6 }, { t: 'vloop', at: 1830, R: 14 },
+      { t: 'roll', at: 380, len: 110, h: 1.5, n: 3 }, { t: 'roll', at: 2350, len: 120, h: 1.6, n: 3 }] },
+  { set: 1, name: 'Spagetti', cross: true, stars: 3, laps: 2, base: 10, bankK: 60, bankMax: 0.5,
+    desc: 'Neljä lenkkiä ja kahdeksan risteystä: rata sukeltaa jatkuvasti oman itsensä ali ja nousee yli. Vuoristorata ilman yhtään tasaista kohtaa.',
+    pts: knotPts(190, 3, 1.15, 44),
+    feats: (L, c, X) => [
+      crossProfile(X, 7, [[520, 18], [1580, -3], [2620, 20], [3680, -2]]),
+      { t: 'roll', at: 680, len: 110, h: 1.4, n: 3 }, { t: 'roll', at: 2780, len: 110, h: 1.4, n: 3 }] },
+  // ---- sarja 3: lisää villejä ratoja ----
+  { set: 3, name: 'Seinämä', stars: 3, base: 12, half: 5.5,
+    desc: 'Lähes pystysuora, 115 metriä korkea seinä. Ylös pääsee vain huippunopeudella (yli 165 km/h) – turbo auttaa. Muuten nosturi vie takaisin alas. Huipulta pitkä laskeutuminen ja pudotushyppy.',
+    pts: stadiumPts(1000, 130),
+    feats: (L) => [
+      { t: 'wall', at: 600, a1: 40, a2: 64, a3: 45, th: 1.45, plat: 260, dlen: 760, back: 520 },
+      { t: 'jump', at: 1560, up: 40, gap: 24, down: 80, h: 3.4, minV: 32 }, { t: 'vloop', at: 1900, R: 17 },
+      { t: 'roll', at: 2620, len: 150, h: 1.6, n: 3 }, { t: 'hill', at: 300, len: 160, h: 5 }] },
+  { set: 3, name: 'Kuilu', stars: 3, base: 40, half: 5.5,
+    desc: 'Rata kulkee 40 metrin korkeudessa ja syöksyy välillä 30 metriä syvään kuiluun. Kaksi korkkiruuvia, tornista pudotushyppy ja silmukka.',
+    pts: roundedRectPts(1000, 440, 110),
+    feats: (L) => [
+      { t: 'jump', at: 250, up: 50, gap: 35, down: 120, h: 4, minV: 35 }, { t: 'hill', at: 590, len: 320, h: -30 },
+      { t: 'cork', at: 975, len: 120, R: 6 }, { t: 'roll', at: 1430, len: 160, h: 1.8, n: 4 },
+      { t: 'mesa', at: 1750, up: 100, flat: 60, down: 200, h: 16 }, { t: 'jump', at: 1780, up: 35, gap: 26, down: 80, h: 3, minV: 31 },
+      { t: 'vloop', at: 2005, R: 17 }, { t: 'cork', at: 2320, len: 125, R: 6 }] },
+  { set: 3, name: 'Taivaankaari', cross: true, stars: 3, base: 20, half: 5.5,
+    desc: 'Valtava kahdeksikko 20 metrin korkeudessa: 26 metriä korkea silta oman radan yli, hyppy, silmukka, korkkiruuvi ja syvä notko.',
+    pts: lemniPts(500, 360, 24, 0.25),
+    feats: (L, c) => [
+      { t: 'mesa', at: c[0], up: 120, flat: 60, down: 170, h: 26 }, { t: 'jump', at: c[1] - 115, up: 36, gap: 22, down: 70, h: 3.2, minV: 31 },
+      { t: 'vloop', at: c[1] + 80, R: 17 }, { t: 'cork', at: c[0] + 260, len: 125, R: 6 },
+      { t: 'hill', u: .3, len: 240, h: -15 }, { t: 'roll', at: 1840, len: 120, h: 2, n: 3 }] },
+  // ---- sarja 4: muuttuva sää ----
+  { set: 4, weather: 'night', name: 'Keskiyön kiito', cross: true, stars: 3, base: 22,
+    desc: 'Yöajo kahdeksikolla: korkea silta oman radan yli, jonka päästä syöksytään lähes pystysuoraan alas. Pitkä hyppy, silmukka ja kumpuja – vain ajovalot ja heijastimet näyttävät tien.',
+    pts: lemniPts(440, 300, 24, 0.4),
+    feats: (L, c) => { const D = [[65, -0.85], [30, 0]], g = wallGeom(D); return [
+      { t: 'prof', pts: [[0, 0], [200, 0], [400, 18], [600, 4], [720, 0], [860, 20], [1005, 20], [1005 + g.adv, 20 + g.Y], [1200, 20 + g.Y], [1450, -4], [1650, 6], [1800, 0], [2140, 0]] },
+      { t: 'wall', at: 1005, segs: D, abs: true, aiV: 32 },
+      { t: 'jump', at: c[1] - 110, up: 40, gap: 26, down: 80, h: 3.2, minV: 34 }, { t: 'vloop', at: c[1] + 80, R: 15 },
+      { t: 'roll', at: 1560, len: 100, h: 1.4, n: 3 }]; } },
+  { set: 4, weather: 'night', name: 'Kuunsilta', stars: 3, base: 34,
+    desc: 'Kuutamoajo: liikkuva nostosilta, silmukka ja korkkiruuvi, sitten 50 metrin lähes pystysuora nousu kuun alle, pitkä hyppy huipulla ja jyrkkä syöksy takaisin alas.',
+    pts: roundedRectPts(1000, 500, 130),
+    feats: (L) => { const C = [[30, 1.3], [15, 1.3], [35, 0]], gc = wallGeom(C), D = [[75, -1.0], [8, -1.0], [35, 0]], gd = wallGeom(D), H = gc.Y; return [
+      { t: 'prof', smooth: true, pts: [[0, 0], ...leafLanding(330, 0), [680, -26], [920, 0], [1180, 0], [1460, 0], [1460 + gc.adv, H], [2400, H], [2400 + gd.adv, H + gd.Y], [2600, H + gd.Y], [L - 30, 0]] },
+      { t: 'bridge', at: 330, len: 64, leaf: 30, sine: true, amin: 0.07, amax: 0.245, period: 10 },
+      { t: 'vloop', at: 560, R: 15 }, { t: 'cork', at: 1000, len: 120, R: 6 },
+      { t: 'wall', at: 1460, segs: C, abs: true, back: 280 }, { t: 'jump', at: 1750, up: 40, gap: 26, down: 90, h: 3.5, minV: 33 },
+      { t: 'wall', at: 2400, segs: D, abs: true, aiV: 32 }]; } },
+  { set: 4, weather: 'snow', name: 'Pakkasraja', stars: 3, base: 30, bankK: 60, bankMax: 0.6,
+    desc: 'Jäinen kaukalo lumisateessa: liikkuva nostosilta liukkaalla, pitkä hyppy, lähes pystysuora nousu ja kallistettu kaarre 30 metrin korkeudessa.',
+    pts: stadiumPts(800, 150),
+    feats: (L) => { const C = [[20, 1.2], [10, 1.2], [25, 0]], gc = wallGeom(C), H = gc.Y; return [
+      { t: 'prof', smooth: true, pts: [[0, H], [300, 0], ...leafLanding(430, 0), [720, -26], [1300, 0], [1720, 0], [1720 + gc.adv, H], [L - 60, H]] },
+      { t: 'bridge', at: 430, len: 64, leaf: 30, sine: true, amin: 0.1, amax: 0.245, period: 11 },
+      { t: 'jump', at: 1500, up: 40, gap: 24, down: 70, h: 3.2, minV: 31 },
+      { t: 'wall', at: 1720, segs: C, abs: true, back: 110 }]; } },
+  { set: 4, weather: 'snow', name: 'Lumivyöry', stars: 3, base: 12,
+    desc: 'Lumipyryssä vuoren yli: lähes pystysuora 70 metrin nousu huipulle, lumiset töyssyt, 60 metrin syöksy laaksoon, pitkä hyppy ja silmukka.',
+    pts: roundedRectPts(1100, 450, 120),
+    feats: (L) => { const C = [[35, 1.35], [25, 1.35], [40, 0]], gc = wallGeom(C), D = [[80, -1.15], [15, -1.15], [40, 0]], gd = wallGeom(D), H = gc.Y, H2 = H + gd.Y; return [
+      { t: 'prof', smooth: true, pts: [[0, 0], [450, 0], [450 + gc.adv, H], [1500, H], [1500 + gd.adv, H2], [2300, H2], [2450, 0]] },
+      { t: 'wall', at: 450, segs: C, abs: true, back: 300 }, { t: 'roll', at: 1160, len: 120, h: 1.4, n: 3 },
+      { t: 'wall', at: 1500, segs: D, abs: true, aiV: 32 },
+      { t: 'jump', at: 1800, up: 50, gap: 30, down: 120, h: 4, minV: 34 }, { t: 'roll', at: 2100, len: 140, h: 1.3, n: 3 },
+      { t: 'vloop', at: 2560, R: 15 }]; } },
+  { set: 4, weather: 'rain', name: 'Myräkkä', cross: true, stars: 3, base: 14,
+    desc: 'Rankkasade apilaradalla: kolme siltaristeystä, joista kahdessa hypätään oman radan yli. 30 metrin mäet ja märkä, liukas asfaltti.',
+    pts: knotPts(165, 2, 1.35, 36),
+    feats: (L, c, X) => [crossProfile(X, 16, [[450, 30], [1450, -6], [2400, 26]]),
+      { t: 'jump', at: 1040, up: 34, gap: 22, down: 60, h: 1.6, minV: 34 }, { t: 'jump', at: 2006, up: 34, gap: 22, down: 60, h: 1.6, minV: 34 },
+      { t: 'roll', u: .32, len: 110, h: 1.4, n: 3 }] },
+  { set: 4, weather: 'rain', name: 'Vesiliukas', stars: 3, base: 32, bankK: 50, bankMax: 0.45,
+    desc: 'Sateinen stadionrata: silmukka, liikkuva nostosilta, korkkiruuvi, 50 metrin lähes pystysuora nousu, pitkä hyppy tasanteella ja jyrkkä syöksy alas.',
+    pts: stadiumPts(900, 110),
+    feats: (L) => { const C = [[30, 1.3], [15, 1.3], [35, 0]], gc = wallGeom(C), D = [[75, -1.0], [8, -1.0], [35, 0]], gd = wallGeom(D), H = gc.Y; return [
+      { t: 'prof', smooth: true, pts: [[0, 0], [260, 0], ...leafLanding(330, 0), [700, -26], [1250, 0], [1540, 0], [1540 + gc.adv, H], [1975, H], [1975 + gd.adv, H + gd.Y], [2300, H + gd.Y], [L - 30, 0]] },
+      { t: 'vloop', at: 140, R: 15 }, { t: 'bridge', at: 330, len: 64, leaf: 30, sine: true, amin: 0.07, amax: 0.245, period: 9 },
+      { t: 'cork', at: 1300, len: 120, R: 6 }, { t: 'wall', at: 1540, segs: C, abs: true, back: 110 },
+      { t: 'jump', at: 1740, up: 40, gap: 28, down: 90, h: 3.5, minV: 34 }, { t: 'wall', at: 1975, segs: D, abs: true, aiV: 32 },
+      { t: 'roll', at: 2250, len: 120, h: 1.4, n: 3 }]; } },
+  { set: 4, weather: 'fog', name: 'Usvaharju', stars: 3, base: 30,
+    desc: 'Sakeassa sumussa hyppy, liikkuva nostosilta, jyrkkä seinämä ylös ja sokeita harjanteita – aukot ja seinät ilmestyvät tyhjästä.',
+    pts: stadiumPts(700, 200),
+    feats: (L) => { const C = [[20, 1.25], [10, 1.25], [25, 0]], gc = wallGeom(C); return [
+      { t: 'prof', smooth: true, pts: [[0, 0], [380, 0], [520, 10], [700, 0], [1060, 12], [1330, 0], ...leafLanding(1400, 0), [1640, -26], [1700, -26], [1700 + gc.adv, -26 + gc.Y], [2020, -26 + gc.Y], [2250, 18], [2500, 2], [L - 20, 0]] },
+      { t: 'jump', at: 170, up: 34, gap: 18, down: 70, h: 2.2, minV: 30 },
+      { t: 'bridge', at: 1400, len: 64, leaf: 30, sine: true, amin: 0.07, amax: 0.245, period: 10, phase: 3 },
+      { t: 'wall', at: 1700, segs: C, abs: true, back: 110 }]; } },
+  { set: 4, weather: 'fog', name: 'Sumuvuono', cross: true, stars: 3, base: 16,
+    desc: 'Sumun peittämä kolmilehtinen rata: kolme siltaristeystä, liikkuva nostosilta, lähes pystysuora pudotus ja hyppy oman radan yli.',
+    pts: paramPts(t => [150 * (Math.sin(t) + 1.6 * Math.sin(-2 * t)), 150 * (Math.cos(t) + 1.6 * Math.cos(-2 * t))], 40),
+    feats: (L, c, X) => { const D = [[45, -0.6], [10, -0.6], [20, 0]], gd = wallGeom(D), P = crossProfile(X, 16, []);
+      const up = P.pts.filter(p => p[1] > 0).map(p => p[0]);
+      return [{ t: 'prof', pts: P.pts.concat([[1000, 28], [2050, -6], [2950, 24], [1450, 16], [1450 + gd.adv, 16 + gd.Y]]) },
+        { t: 'wall', at: 1450, segs: D, abs: true, aiV: 32 },
+        { t: 'jump', at: 2434, up: 30, gap: 22, down: 60, h: 1.3, minV: 34 }, { t: 'roll', at: 1150, len: 110, h: 1.3, n: 3 }]; } },
 ];
 
+// ristevien ratojen korkeusprofiili: ohitukset vuorotellen ylä- ja alatasolla (kuin solmukuvassa)
+function crossProfile(X, H, extra) {
+  const ps = []; X.forEach((c, k) => { ps.push({ s: c[0], k }); ps.push({ s: c[1], k }); });
+  ps.sort((a, b) => a.s - b.s);
+  ps.forEach((p, i) => p.up = i % 2 === 0);
+  const ok = X.every((c, k) => { const a = ps.filter(p => p.k === k); return a[0].up !== a[1].up; });
+  if (!ok) { const seen = {}; ps.forEach(p => { p.up = seen[p.k] === undefined ? true : !seen[p.k]; seen[p.k] = p.up; }); }
+  return { t: 'prof', pts: ps.map(p => [p.s, p.up ? H : 0]).concat(extra || []) };
+}
 function buildTrack(def) {
   const pts = def.pts.map(p => new THREE.Vector3(p[0], 0, p[1]));
   const curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
@@ -406,21 +571,51 @@ function buildTrack(def) {
   for (let i = 0; i < N; i++) K0[i] = angDiff(HD[(i + 4) % N], HD[(i - 4 + N) % N]) / (8 * ds);
   for (let i = 0; i < N; i++) { let s = 0; for (let j = -6; j <= 6; j++) s += K0[(i + j + N) % N]; K[i] = s / 13; }
   const BK = new Float32Array(N);
-  for (let i = 0; i < N; i++) BK[i] = clamp(K[i] * 28, -0.22, 0.22);
-  const tr = { def, name: def.name, N, L, ds, X, Z, HD, K, BK, base: def.base, half: def.half || 6, laps: def.laps || LAPS, feats: [], jumps: [], gap: false };
-  let best = 1e9, bi = -1, bj = -1;
+  const bkK = def.bankK || 28, bkM = def.bankMax || 0.22, BK0 = new Float32Array(N);
+  for (let i = 0; i < N; i++) BK0[i] = clamp(K[i] * bkK, -bkM, bkM);
+  // kallistus pehmennetään pitkällä ikkunalla, jotta kallistuksen muutos ei heitä autoa ilmaan
+  const bw = Math.max(6, Math.round(30 / ds));
+  for (let i = 0; i < N; i++) { let t = 0; for (let j = -bw; j <= bw; j++) t += BK0[(i + j + N) % N]; BK[i] = t / (2 * bw + 1); }
+  // sää: pito, kiihtyvyys ja jarrut (talvi ja sade liukkaampia)
+  const WX = { snow: [0.55, 0.8, 0.5], rain: [0.68, 0.92, 0.68] }[def.weather] || [1, 1, 1];
+  const tr = { weather: def.weather || 'clear', gripMul: WX[0], accMul: WX[1], brakeMul: WX[2], def, name: def.name, N, L, ds, X, Z, HD, K, BK, base: def.base, half: def.half || 6, laps: def.laps || LAPS, feats: [], jumps: [], gap: false };
+  // kaikki risteyskohdat (rata kulkee itsensä yli tai ali): [sig1, sig2] -parit
+  const cand = [];
   if (def.cross) for (let i = 0; i < N; i += 2) for (let j = i + 2; j < N; j += 2) {
     if (Math.min(j - i, N - j + i) * ds < 200) continue;
     const dx = X[i] - X[j], dz = Z[i] - Z[j], d2 = dx * dx + dz * dz;
-    if (d2 < best) { best = d2; bi = i; bj = j; }
+    if (d2 < 36) cand.push([i, j, d2]);
   }
-  tr.cross = best < 36 ? [bi * ds, bj * ds] : [0.46 * L, 0.96 * L];
-  tr.Lsp = L; tr.segs = []; tr.bridges = [];
-  for (const f of def.feats(L, tr.cross)) {
+  cand.sort((a, b) => a[2] - b[2]);
+  const acc = [];
+  const cd = (u, v) => Math.min(Math.abs(u - v), N - Math.abs(u - v)) * ds;
+  for (const c of cand) { if (!acc.some(a => (cd(a[0], c[0]) < 60 && cd(a[1], c[1]) < 60) || (cd(a[0], c[1]) < 60 && cd(a[1], c[0]) < 60))) acc.push(c); }
+  tr.crosses = acc.map(a => [a[0] * ds, a[1] * ds]).sort((a, b) => a[0] - b[0]);
+  tr.cross = acc.length ? [acc[0][0] * ds, acc[0][1] * ds] : [0.46 * L, 0.96 * L];
+  tr.Lsp = L; tr.segs = []; tr.bridges = []; tr.walls = [];
+  for (const f of def.feats(L, tr.cross, tr.crosses)) {
     const g = Object.assign({}, f); const c = f.at !== undefined ? f.at : f.u * L;
     if (f.t === 'vloop') { const Ls = 2 * Math.PI * f.R; tr.segs.push({ kind: 'loop', sig: mod(c, L), R: f.R, Ls, Lp: Ls, adv: 0, dl: 2 * tr.half + 3, minV: Math.sqrt(5 * G * f.R) * 1.12 }); continue; }
+    if (f.t === 'wall') {
+      // lähes pystysuora seinämä: kaari ylös (a1), suora nousu (a2), kaari tasanteelle (a3)
+      const a1 = f.a1 || 40, a2 = f.a2 || 25, a3 = f.a3 || 45, tm = f.th || 1.40;
+      // kulmaprofiili: joko [pituus, loppukulma] -pätkät tai oletuksena nousu–suora–kaari
+      const pieces = f.segs || [[a1, tm], [a2, tm], [a3, 0]];
+      const Ls = pieces.reduce((a, p) => a + p[0], 0), n = Math.ceil(Ls / 0.5);
+      const thAt = r => { let th0 = 0, acc = 0; for (const [len, th1] of pieces) { if (r <= acc + len) return th0 + (th1 - th0) * (r - acc) / len; acc += len; th0 = th1; } return th0; };
+      const xs = new Float32Array(n + 1), ys = new Float32Array(n + 1), ths = new Float32Array(n + 1); let x = 0, y = 0;
+      for (let i = 0; i <= n; i++) {
+        const r = i * Ls / n, th = thAt(r);
+        if (i > 0) { const tmid = (ths[i - 1] + th) / 2, dr = Ls / n; x += Math.cos(tmid) * dr; y += Math.sin(tmid) * dr; }
+        xs[i] = x; ys[i] = y; ths[i] = th;
+      }
+      tr.segs.push({ kind: 'wall', sig: mod(c, L), Ls, adv: x, H: y, xs, ys, ths, n, abs: !!f.abs, aiV: f.aiV || 0, plat: f.plat || 200, dlen: f.dlen || 400, back: f.back || 480, minV: 0 });
+      continue;
+    }
     if (f.t === 'cork') { const Lc = f.len, Rc = f.R, Ls = Math.hypot(Lc, 2 * Math.PI * Rc); tr.segs.push({ kind: 'cork', sig: mod(c, L), Rc, Lc, Ls, adv: Lc, minV: Math.sqrt(G * Rc) * Ls / (2 * Math.PI * Rc) * 1.2 }); continue; }
-    if (f.t === 'bridge') { tr.bridges.push({ sig: mod(c, L), Lb: f.len, amax: f.amax || 0.5, period: f.period || 14, phase: f.phase || 0 }); continue; }
+    if (f.t === 'bridge') { tr.bridges.push({ sig: mod(c, L), Lb: f.len, amax: f.amax || 0.5, period: f.period || 14, phase: f.phase || 0, sine: !!f.sine, fixed: f.fixed, leaf: f.leaf || 0, amin: f.amin || 0 }); continue; }
+    if (f.t === 'prof') { g.s0 = 0; g.len = L + 1; g.pts = f.pts.map(p => [mod(p[0], L), p[1]]).sort((a, b) => a[0] - b[0]); tr.feats.push(g); continue; }
+    if (f.t === 'roll') g.n = Math.max(1, Math.min(f.n, Math.floor(f.len / 55))); // töyssyjen väli vähintään ~55 m: ei ponnauta autoa normaalivauhdilla
     if (f.t === 'hill' || f.t === 'roll') { g.s0 = c - f.len / 2; }
     else if (f.t === 'mesa') { g.len = f.up + f.flat + f.down; g.s0 = c - f.up - f.flat / 2; }
     else if (f.t === 'jump') { g.len = f.up + f.gap + f.down; g.s0 = c - f.up; g.gs = mod(c, L); g.ge = mod(c + f.gap, L); tr.jumps.push(g); }
@@ -429,19 +624,21 @@ function buildTrack(def) {
   tr.segs.sort((a, b) => a.sig - b.sig);
   let cum = 0; for (const l of tr.segs) { l.s0 = l.sig + cum; cum += l.Ls - l.adv; }
   tr.L = L + cum;
-  tr.loops = tr.segs.filter(l => l.kind === 'loop');
+  tr.loops = tr.segs.filter(l => l.kind === 'loop'); tr.walls = tr.segs.filter(l => l.kind === 'wall');
   for (const j of tr.jumps) { j.gs = toTrackS(tr, j.gs); j.ge = toTrackS(tr, j.ge); }
   for (const b of tr.bridges) { b.s0 = toTrackS(tr, b.sig); b.s1 = toTrackS(tr, b.sig + b.Lb); }
   return tr;
 }
 
 // radan matka s (sisältää silmukat) -> spline-matka sig
-const SG = { sig: 0, loop: null, cork: null, r: 0 };
+const SG = { sig: 0, loop: null, cork: null, wall: null, r: 0 };
+const WQ = { x: 0, y: 0, th: 0 };
+function wallAt(w, r) { const f = clamp(r / w.Ls, 0, 1) * w.n; const i = Math.min(w.n - 1, Math.floor(f)), t = f - i; WQ.x = lerp(w.xs[i], w.xs[i + 1], t); WQ.y = lerp(w.ys[i], w.ys[i + 1], t); WQ.th = lerp(w.ths[i], w.ths[i + 1], t); return WQ; }
 function sigOf(tr, s) {
-  s = mod(s, tr.L); let cum = 0; SG.loop = null; SG.cork = null;
+  s = mod(s, tr.L); let cum = 0; SG.loop = null; SG.cork = null; SG.wall = null;
   for (const l of tr.segs) {
     if (s < l.s0) { SG.sig = s - cum; return SG; }
-    if (s < l.s0 + l.Ls) { SG.r = s - l.s0; SG.sig = l.sig + l.adv * SG.r / l.Ls; if (l.kind === 'loop') SG.loop = l; else SG.cork = l; return SG; }
+    if (s < l.s0 + l.Ls) { SG.r = s - l.s0; if (l.kind === 'wall') { SG.sig = l.sig + wallAt(l, SG.r).x; SG.wall = l; return SG; } SG.sig = l.sig + l.adv * SG.r / l.Ls; if (l.kind === 'loop') SG.loop = l; else SG.cork = l; return SG; }
     cum += l.Ls - l.adv;
   }
   SG.sig = s - cum; return SG;
@@ -453,11 +650,13 @@ function toTrackS(tr, sig) {
 }
 // nostosilta: kulma ajan funktiona (suljettu 6 s, aukeaa 2 s, auki 3 s, sulkeutuu 2 s, suljettu 1 s)
 function bridgeAngle(b, t) {
+  if (b.fixed !== undefined) return b.fixed;
+  if (b.sine) return b.amin + (b.amax - b.amin) * (0.5 - 0.5 * Math.cos(2 * Math.PI * (t + b.phase) / b.period)); // liikkuu jatkuvasti edestakaisin
   const p = mod(t + b.phase, b.period); let o = 0;
   if (p < 6) o = 0; else if (p < 8) { const x = (p - 6) / 2; o = x * x * (3 - 2 * x); } else if (p < 11) o = 1; else if (p < 13) { const x = (p - 11) / 2; o = 1 - x * x * (3 - 2 * x); }
   return o * b.amax;
 }
-function bridgeWarn(b, t) { const p = mod(t + b.phase, b.period); return p > 4.5 && p < 13.3; }
+function bridgeWarn(b, t) { if (b.sine) return bridgeAngle(b, t) > 0.04; const p = mod(t + b.phase, b.period); return p > 4.5 && p < 13.3; }
 function loopOff(tr, sg) {
   if (sg.loop) return sg.loop.dl * sg.r / sg.loop.Lp;
   for (const l of tr.loops) { const r = mod(sg.sig - l.sig, tr.Lsp); if (r < 110) { const x = r / 110; return l.dl * (1 - x * x * (3 - 2 * x)); } }
@@ -467,7 +666,14 @@ function heightAt(tr, s) {
   const sg = sigOf(tr, s); let lp = 0;
   if (sg.loop) lp = sg.loop.R * (1 - Math.cos(2 * Math.PI * sg.r / sg.loop.Ls));
   else if (sg.cork) lp = sg.cork.Rc * (1 - Math.cos(2 * Math.PI * sg.r / sg.cork.Ls));
-  s = sg.sig; let h = tr.base + lp, gap = false;
+  else if (sg.wall) lp = wallAt(sg.wall, sg.r).y;
+  // 'abs'-seinämä (mäkihypyn pudotus): korkeus = sisääntulokohdan korkeus + profiili
+  const sEval = sg.wall && sg.wall.abs ? sg.wall.sig : sg.sig;
+  for (let i = 0; i < tr.walls.length; i++) {
+    const w = tr.walls[i]; if (w.abs) continue; const rel = mod(sg.sig - (w.sig + w.adv), tr.Lsp);
+    if (rel < w.plat) lp += w.H; else if (rel < w.plat + w.dlen) lp += w.H * 0.5 * (1 + Math.cos(Math.PI * (rel - w.plat) / w.dlen));
+  }
+  s = sEval; let h = tr.base + lp, gap = false;
   for (let i = 0; i < tr.feats.length; i++) {
     const f = tr.feats[i]; let r = s - f.s0; if (r < 0) r += tr.Lsp; if (r >= f.len) continue;
     switch (f.t) {
@@ -478,6 +684,21 @@ function heightAt(tr, s) {
         else if (r < f.up + f.flat) h += f.h;
         else h += f.h * 0.5 * (1 + Math.cos(Math.PI * (r - f.up - f.flat) / f.down));
         break;
+      case 'prof': {
+        const k = f.pts, n = k.length; let i0 = n - 1;
+        for (let q = 0; q < n; q++) { if (k[q][0] <= s) i0 = q; else break; }
+        const A = k[i0], B = k[(i0 + 1) % n]; let span = B[0] - A[0]; if (span <= 0) span += tr.Lsp;
+        let x = s - A[0]; if (x < 0) x += tr.Lsp;
+        if (f.smooth) { // monotoninen kuutiollinen (PCHIP): ei ylityksiä, tasaiset kohdat pysyvät tasaisina
+          const P0 = k[(i0 - 1 + n) % n], P3 = k[(i0 + 2) % n], gapL = d => d <= 0 ? d + tr.Lsp : d;
+          const h0 = gapL(A[0] - P0[0]), h2 = gapL(P3[0] - B[0]);
+          const d0 = (A[1] - P0[1]) / h0, d1 = (B[1] - A[1]) / span, d2 = (P3[1] - B[1]) / h2;
+          const tan = (dl, dr, hl, hr) => { if (dl * dr <= 0) return 0; const w1 = 2 * hr + hl, w2 = hr + 2 * hl; return (w1 + w2) / (w1 / dl + w2 / dr); };
+          const m0 = tan(d0, d1, h0, span) * span, m1 = tan(d1, d2, span, h2) * span, t = clamp(x / span, 0, 1), t2 = t * t, t3 = t2 * t;
+          h += (2 * t3 - 3 * t2 + 1) * A[1] + (t3 - 2 * t2 + t) * m0 + (-2 * t3 + 3 * t2) * B[1] + (t3 - t2) * m1; break;
+        }
+        const u = 0.5 - 0.5 * Math.cos(Math.PI * clamp(x / span, 0, 1)); h += A[1] + (B[1] - A[1]) * u; break;
+      }
       case 'jump':
         if (r < f.up) { const x = r / f.up; h += f.h * x * x; }
         else if (r < f.up + f.gap) { h += f.h; gap = true; }
@@ -487,14 +708,16 @@ function heightAt(tr, s) {
   }
   for (let i = 0; i < tr.bridges.length; i++) {
     const b = tr.bridges[i]; const x = mod(s - b.sig, tr.Lsp); if (x >= b.Lb) continue;
-    const a = bridgeAngle(b, TT), half = b.Lb / 2, tip = half * Math.cos(a), ta = Math.tan(a);
+    const a = bridgeAngle(b, TT), ta = Math.tan(a);
+    if (b.leaf) { const tip = b.leaf * Math.cos(a); if (x < tip) h += x * ta; else { h += b.leaf * Math.sin(a); gap = true; } continue; } // yksi nouseva lehti + kiinteä aukko
+    const half = b.Lb / 2, tip = half * Math.cos(a);
     if (x < tip) h += x * ta; else if (x > b.Lb - tip) h += (b.Lb - x) * ta; else { h += half * Math.sin(a); gap = true; }
   }
   tr.gap = gap; return h;
 }
 function inBridgeZone(tr, s) { const sg = sigOf(tr, s); for (const b of tr.bridges) if (mod(sg.sig - b.sig, tr.Lsp) < b.Lb) return b; return null; }
 // kallistus: poikittainen kaltevuus (m/m), ulkoreuna ylempänä
-function bankAt(tr, s) { const sg = sigOf(tr, s); if (sg.loop || sg.cork) return 0; s = sg.sig; const f = s / tr.ds; let i = Math.floor(f); const t = f - i; i %= tr.N; return lerp(tr.BK[i], tr.BK[(i + 1) % tr.N], t); }
+function bankAt(tr, s) { const sg = sigOf(tr, s); if (sg.loop || sg.cork || sg.wall) return 0; s = sg.sig; const f = s / tr.ds; let i = Math.floor(f); const t = f - i; i %= tr.N; return lerp(tr.BK[i], tr.BK[(i + 1) % tr.N], t); }
 function useTrack(tr) { track = tr; HALF = tr.half; }
 function slopeAt(tr, s) { return (heightAt(tr, s + 0.4) - heightAt(tr, s - 0.4)) / 0.8; }
 
@@ -505,12 +728,15 @@ function samp(tr, s) {
   SM.hd = tr.HD[i] + angDiff(tr.HD[j], tr.HD[i]) * t; SM.k = lerp(tr.K[i], tr.K[j], t);
   SM.rx = -Math.cos(SM.hd); SM.rz = Math.sin(SM.hd);
   const off = loopOff(tr, sg); SM.x += SM.rx * off; SM.z += SM.rz * off;
-  SM.loop = sg.loop; SM.cork = sg.cork; SM.phi = 0; SM.th = 0;
+  SM.loop = sg.loop; SM.cork = sg.cork; SM.wall = sg.wall; SM.phi = 0; SM.th = 0;
   SM.lx = SM.rx; SM.ly = 0; SM.lz = SM.rz; SM.nx = 0; SM.ny = 1; SM.nz = 0;
   if (sg.loop) {
     SM.phi = 2 * Math.PI * sg.r / sg.loop.Ls; const fw = sg.loop.R * Math.sin(SM.phi), sp = Math.sin(SM.phi);
     SM.x += Math.sin(SM.hd) * fw; SM.z += Math.cos(SM.hd) * fw; SM.k = 0;
     SM.nx = -Math.sin(SM.hd) * sp; SM.ny = Math.cos(SM.phi); SM.nz = -Math.cos(SM.hd) * sp;
+  } else if (sg.wall) {
+    const th = SM.phi = wallAt(sg.wall, sg.r).th, sp = Math.sin(th); SM.k = 0;
+    SM.nx = -Math.sin(SM.hd) * sp; SM.ny = Math.cos(th); SM.nz = -Math.cos(SM.hd) * sp;
   } else if (sg.cork) {
     const th = SM.th = 2 * Math.PI * sg.r / sg.cork.Ls, ct = Math.cos(th), st = Math.sin(th), R = sg.cork.Rc;
     SM.x += SM.rx * R * st; SM.z += SM.rz * R * st; SM.k = 0;
@@ -526,7 +752,7 @@ function newCar(isAI, s, d) {
   return { isAI, s: mod(s, track.L), d, psi: 0, v: 0, y: heightAt(track, s) + bankAt(track, s) * d, vy: 0, grounded: true, state: 'drive',
     dist: s > track.L / 2 ? s - track.L : s, damage: 0, boost: 100, boosting: false, steer: 0, pitch: 0, susp: 0, suspV: 0,
     wheelRot: 0, timer: 0, airT: 0, lap: 0, lapStart: 0, lapTimes: [], finished: false, finishTime: 0, lane: d, falls: 0,
-    wrecked: false, gas: false, inLoop: false, loopPhi: 0, inCork: false, corkTh: 0, cork: null };
+    wrecked: false, gas: false, inLoop: false, loopPhi: 0, inCork: false, corkTh: 0, cork: null, inWall: false, wallTh: 0 };
 }
 
 function hurt(c, amt) {
@@ -550,6 +776,12 @@ function startFall(c, fromGap) {
   c.fp = new THREE.Vector3(sm.x + sm.rx * c.d, c.y, sm.z + sm.rz * c.d);
   c.fv = new THREE.Vector3(Math.sin(th) * c.v, c.vy, Math.cos(th) * c.v);
   c.fyaw = th; c.fspin = (Math.random() - 0.5) * 5; c.froll = 0; c.ftumble = 0;
+  if (c.inWall) {
+    const w = sigOf(track, c.s).wall, cp = Math.cos(c.wallTh), sp = Math.sin(c.wallTh);
+    c.fv.set(Math.sin(sm.hd) * c.v * cp, c.v * sp, Math.cos(sm.hd) * c.v * cp);
+    c.inWall = false;
+    if (w) { c.respawnS = mod(w.s0 - w.back, track.L); c.boost = Math.max(c.boost, 70); if (!c.isAI) { hurt(c, 10); HOOKS.msg('Vauhti loppui seinämällä · turbo tankattu, yritä uudelleen', 'bad'); HOOKS.fall(); } return; }
+  }
   if (c.inCork && c.cork) {
     const k = c.cork, ct = Math.cos(c.corkTh), st = Math.sin(c.corkTh), vt = c.v * 2 * Math.PI * k.Rc / k.Ls, vf = c.v * k.Lc / k.Ls;
     c.fp.set(sm.x + sm.lx * c.d, c.y, sm.z + sm.lz * c.d);
@@ -590,7 +822,7 @@ function stepCrane(c, dt) {
   if (t >= 1) {
     c.dist += wrapD(c.respawnS - c.s, track.L);
     c.s = c.respawnS; c.d = 0; c.psi = 0; c.v = 0; c.y = heightAt(track, c.s); c.vy = 0; c.grounded = true;
-    c.pitch = 0; c.state = 'drive'; c.steer = 0;
+    c.pitch = 0; c.state = 'drive'; c.steer = 0; c.slideV = 0; c.slideGrace = 3;
   }
 }
 
@@ -603,10 +835,9 @@ function stepCar(c, inp, dt) {
   const sm = samp(tr, c.s); const k = sm.k;
   const av = Math.abs(c.v);
   let omega = 0;
-  const nearGround = c.grounded || (c.y - heightAt(tr, c.s) - bankAt(tr, c.s) * c.d < 0.6 && !tr.gap);
   {
-    const sf = Math.min(1, av / 5), maxO = Math.min(1.8, (GRIP + 10 * Math.abs(bankAt(tr, c.s))) / Math.max(av, 1));
-    omega = clamp(c.steer * 1.8 * sf, -maxO, maxO) * (c.v < 0 ? -1 : 1) * (nearGround ? 1 : AIRSTEER);
+    const sf = Math.min(1, av / 5), maxO = Math.min(1.8, (GRIP * tr.gripMul + 10 * Math.abs(bankAt(tr, c.s))) / Math.max(av, 1));
+    omega = c.grounded ? clamp(c.steer * 1.8 * sf, -maxO, maxO) * (c.v < 0 ? -1 : 1) : 0; // ilmassa ei voi ohjata
   }
   c.psi = clamp(c.psi + (k * c.v * Math.cos(c.psi) + omega) * dt, -1.4, 1.4);
 
@@ -614,19 +845,33 @@ function stepCar(c, inp, dt) {
   c.boosting = false;
   if (c.grounded) {
     if (c.inLoop) a -= G * Math.sin(c.loopPhi);
+    else if (c.inWall) a -= G * Math.sin(c.wallTh);
     else if (c.inCork) a -= G * c.cork.Rc * Math.sin(c.corkTh) * 2 * Math.PI / c.cork.Ls;
     else { const sl = slopeAt(tr, c.s); a -= G * sl / Math.sqrt(1 + sl * sl); }
     const canBoost = inp.boost && c.boost > 0 && !inp.brake;
-    if (canBoost) { c.boosting = true; c.boost = Math.max(0, c.boost - 18 * dt); a += 24 * Math.max(0, 1 - c.v / 74); }
-    else if (inp.gas) a += 15 * Math.max(0, 1 - c.v / 58);
-    if (inp.brake) { if (c.v > 0.5) a -= 26; else if (c.v > -8) a -= 7; }
+    const trac = c.inWall ? Math.max(0.05, Math.cos(c.wallTh) ** 2) : 1; // pitoa jyrkällä seinällä vähemmän
+    if (canBoost) { c.boosting = true; c.boost = Math.max(0, c.boost - 18 * dt); a += trac * tr.accMul * 24 * Math.max(0, 1 - c.v / 74); }
+    else if (inp.gas) a += trac * tr.accMul * 15 * Math.max(0, 1 - c.v / 58);
+    if (inp.brake) { if (c.v > 0.5) a -= 26 * tr.brakeMul; else if (c.v > -8) a -= 7; }
     if (!inp.gas && !inp.brake && !canBoost) a -= 0.7 * Math.sign(c.v) * Math.min(1, av);
     a -= Math.abs(Math.sin(c.psi)) * c.v * 0.6;
   }
   c.v += a * dt;
 
   const vs = c.v * Math.cos(c.psi), vd = c.v * Math.sin(c.psi);
-  const sNew = c.s + vs * dt; c.d += vd * dt; c.dist += vs * dt;
+  // jyrkästi kallistetussa kaarteessa hidas auto liukuu sivuttain kohti alempaa reunaa
+  c.slideGrace = Math.max(0, (c.slideGrace || 0) - dt);
+  if (c.grounded && !c.inLoop && !c.inCork && !c.inWall) {
+    const bk = bankAt(tr, c.s), sb = bk / Math.sqrt(1 + bk * bk), cb = 1 / Math.sqrt(1 + bk * bk);
+    const aDown = G * Math.abs(sb) - c.v * c.v * Math.abs(k) * cb;      // painovoima rinteen suuntaan miinus keskihakuvoiman tuki
+    const muS = 0.25 * G * tr.gripMul, muK = 0.15 * G * tr.gripMul;
+    if (Math.abs(bk) > 0.05 && aDown > muS && c.slideGrace <= 0) c.slideV = (c.slideV || 0) - Math.sign(bk) * (aDown - muK) * dt;
+    else if (c.slideV) { const dv = muK * 2 * dt; c.slideV = Math.abs(c.slideV) <= dv ? 0 : c.slideV - Math.sign(c.slideV) * dv; }
+  }
+  // ilmassa seinämän kohdalla edetään vaakasuunnassa: radan pituusmitta seinällä on pidempi kuin vaakamatka
+  let dsS = vs * dt;
+  if (!c.grounded) { const sgA = sigOf(tr, c.s); if (sgA.wall) dsS /= Math.max(0.2, Math.cos(wallAt(sgA.wall, sgA.r).th)); }
+  const sNew = c.s + dsS; c.d += vd * dt + (c.slideV || 0) * dt; c.dist += dsS;
   const sgN = sigOf(tr, sNew);
   if (sgN.loop && (c.grounded || c.inLoop)) {
     const l = sgN.loop, phi = 2 * Math.PI * sgN.r / l.Lp;
@@ -635,6 +880,23 @@ function stepCar(c, inp, dt) {
     if (c.v * c.v / l.R + G * Math.cos(phi) < 0 || Math.abs(c.d) > HALF + 0.1) startFall(c, false);
     return;
   }
+  if (sgN.wall && sgN.wall.H > 0 && !c.grounded && !c.inWall && c.y - heightAt(tr, sNew) < 3 && c.y - heightAt(tr, sNew) > -1.5) c.grounded = true; // tartu noususeinään lennosta
+  if (sgN.wall && (c.grounded || c.inWall)) {
+    const q = wallAt(sgN.wall, sgN.r);
+    c.inWall = true; c.wallTh = q.th; c.s = mod(sNew, tr.L);
+    c.y = heightAt(tr, c.s); c.vy = 0; c.grounded = true; c.pitch = c.wallTh;
+    if ((c.wallTh > 0.9 && c.v < 6) || Math.abs(c.d) > HALF + 0.1) { startFall(c, false); return; }
+    // jyrkkenevä pudotus: jos vauhti on liian suuri kaarevuuteen nähden, auto irtoaa (siivistä on hieman pitoa avuksi)
+    if (sgN.wall.H < 0) {
+      const dth = (wallAt(sgN.wall, Math.min(sgN.wall.Ls, sgN.r + 0.5)).th - c.wallTh) / 0.5;
+      if (dth < 0 && c.v * c.v * -dth > G * (Math.cos(c.wallTh) + 1.5)) {
+        c.inWall = false; c.grounded = false; c.airT = 0; c.vy = c.v * Math.sin(c.wallTh); c.v *= Math.cos(c.wallTh);
+        if (!c.isAI && TT - (c.detMsg || -9) > 3) { c.detMsg = TT; HOOKS.msg('Liian kova vauhti · auto irtosi pudotuksen reunalta', 'bad'); }
+      }
+    }
+    return;
+  }
+  if (c.inWall) { c.inWall = false; c.pitch = c.wallTh; c.vy = c.v * Math.sin(c.wallTh); c.v *= Math.cos(c.wallTh); c.grounded = true; c.s = mod(sNew, tr.L); c.y = heightAt(tr, c.s) + bankAt(tr, c.s) * c.d; c.wallTh = 0; return; }
   if (sgN.cork && (c.grounded || c.inCork)) {
     const k = sgN.cork, th = 2 * Math.PI * sgN.r / k.Ls;
     c.inCork = true; c.cork = k; c.corkTh = th; c.s = mod(sNew, tr.L);
@@ -654,8 +916,15 @@ function stepCar(c, inp, dt) {
       const nvy0 = (sh - c.y) / dt, acc0 = (nvy0 - c.vy) / dt;
       c.popCd = Math.max(0, (c.popCd || 0) - dt);
       // irtoaminen: kun harjanne vaatisi yli POPG g:n alaspäin painavan voiman, jousitus ponnauttaa auton ilmaan
-      const pop = acc0 < -POPG * G && Math.abs(c.v) > 18 && c.popCd <= 0;
-      if (yb > sh + 0.05 || pop) {
+      const bkN = Math.abs(bankAt(tr, sNew));
+      const pop = acc0 < -(POPG + 4 * bkN) * G && Math.abs(c.v) > 18 && c.popCd <= 0;
+      // rata "lähtee alta": harjanne kääntyy jyrkkään laskuun -> auto irtoaa heti kun vaadittu alaspäin kiihtyvyys ylittää painovoiman
+      let away = false;
+      if (!pop && acc0 < -(1.05 + 4 * bkN) * G && Math.abs(c.v) > 15) {
+        const sl = slopeAt(tr, sNew), ahead = heightAt(tr, sNew + 30) + bankAt(tr, sNew + 30) * c.d;
+        away = (sh + sl * 30) - ahead > 2.5;
+      }
+      if (yb > sh + 0.05 || pop || away) {
         c.grounded = false; c.airT = 0; c.y = yb; c.vy -= G * dt;
         if (pop) { c.vy += Math.min(0.8, 0.012 * Math.abs(c.v)); c.popCd = 0.5; c.suspV += 1.2; }
       }
@@ -668,6 +937,11 @@ function stepCar(c, inp, dt) {
     }
   } else {
     c.airT += dt; c.vy -= G * dt; c.y += c.vy * dt;
+    if (sgN.wall && exists && c.y <= sh) { // alastulo seinämän pinnalle: nopeus jaetaan pinnan suuntaiseen ja kohtisuoraan osaan
+      const th = wallAt(sgN.wall, sgN.r).th, vt = vs * Math.cos(th) + c.vy * Math.sin(th), vn = -vs * Math.sin(th) + c.vy * Math.cos(th);
+      c.s = mod(sNew, tr.L); c.y = sh; c.vy = 0; c.v = vt; c.grounded = true; c.inWall = true; c.wallTh = th; c.pitch = th;
+      onLand(c, Math.max(0, -vn), false); return;
+    }
     if (exists && c.y <= sh) {
       if (c.y > sh - 1.2) {
         const edge = c.y < sh - 0.35;
@@ -679,27 +953,33 @@ function stepCar(c, inp, dt) {
   c.s = mod(sNew, tr.L);
   if (c.isAI) { const lim = HALF - 1.3; if (Math.abs(c.d) > lim) { c.d = clamp(c.d, -lim, lim); c.psi *= 0.5; } }
   // visuaalinen nyökkäys
-  const pt = c.grounded ? Math.atan(slopeAt(tr, c.s) * Math.cos(c.psi)) : Math.atan2(c.vy, Math.max(5, Math.abs(vs))) * 0.7;
-  c.pitch += (pt - c.pitch) * Math.min(1, dt * (c.grounded ? 14 : 2.5));
+  // ilmassa auto säilyttää asentonsa (inertia); maassa se asettuu rinteen mukaan
+  if (c.grounded) { const pt = Math.atan(slopeAt(tr, c.s) * Math.cos(c.psi)); c.pitch += (pt - c.pitch) * Math.min(1, dt * 14); }
 }
 
 function collideCars(a, b, onHit) {
-  if (a.state !== 'drive' || b.state !== 'drive') return;
   const L = track.L, ds = wrapD(b.s - a.s, L), dd = b.d - a.d;
-  if (Math.abs(ds) > 4.3 || Math.abs(dd) > 2.1 || Math.abs(a.y - b.y) > 1.6) return;
-  const ox = 4.3 - Math.abs(ds), oy = 2.1 - Math.abs(dd);
+  if (a.state !== 'drive' || b.state !== 'drive' || Math.abs(ds) > 4.3 || Math.abs(dd) > 2.1 || Math.abs(a.y - b.y) > 1.6) { a.contact = b.contact = false; return; }
+  const ox = 4.3 - Math.abs(ds), oy = 2.1 - Math.abs(dd), first = !a.contact;
   let rel = 0;
   if (oy < ox) {
-    const sgn = dd >= 0 ? 1 : -1; a.d -= sgn * oy / 2; b.d += sgn * oy / 2;
-    a.psi -= sgn * 0.06; b.psi += sgn * 0.06; rel = Math.abs(a.v - b.v) * 0.3 + 2;
+    // kylkikosketus: autot liukuvat pehmeästi erilleen, suunta saa pienen tönäisyn vain ensikosketuksessa
+    const sgn = dd >= 0 ? 1 : -1, push = Math.min(oy, 0.6) * 0.5;
+    a.d -= sgn * push / 2; b.d += sgn * push / 2;
+    const la = a.v * Math.sin(a.psi) + (a.slideV || 0), lb = b.v * Math.sin(b.psi) + (b.slideV || 0);
+    rel = Math.max(0, (la - lb) * sgn);
+    if (first) { a.psi -= sgn * 0.02; b.psi += sgn * 0.02; }
   } else {
     const front = ds > 0 ? b : a, rear = ds > 0 ? a : b;
     rel = rear.v - front.v;
     if (rel > 0) { const avg = (rear.v + front.v) / 2; rear.v = avg - rel * 0.15; front.v = avg + rel * 0.15; }
-    rear.s = mod(rear.s - ox / 2, L); rear.dist -= ox / 2; front.s = mod(front.s + ox / 2, L); front.dist += ox / 2;
+    const push = Math.min(ox, 0.8) * 0.5;
+    rear.s = mod(rear.s - push / 2, L); rear.dist -= push / 2; front.s = mod(front.s + push / 2, L); front.dist += push / 2;
   }
-  if (rel > 4) { hurt(a, (rel - 4) * 1.2); hurt(b, (rel - 4) * 1.2); }
-  if (onHit) onHit(rel);
+  // vauriot ja ääni vain uudesta osumasta, ei jatkuvasta kosketuksesta
+  if (first && rel > 4) { hurt(a, (rel - 4) * 1.2); hurt(b, (rel - 4) * 1.2); }
+  if (first && onHit) onHit(rel);
+  a.contact = b.contact = true;
 }
 
 const DIFFS = [{ name: 'Helppo', top: 40 }, { name: 'Normaali', top: 45.5 }, { name: 'Vaikea', top: 50 }];
@@ -708,14 +988,29 @@ function aiInput(c, other, top) {
   const tr = track, L = tr.L, inp = { steer: 0, gas: false, brake: false, boost: false };
   if (c.state !== 'drive') return inp;
   let vt = top;
-  for (let k = 0; k <= 100; k += 10) { const kk = Math.abs(samp(tr, c.s + k).k); if (kk > 1e-4) vt = Math.min(vt, Math.sqrt((GRIP + 10 * Math.abs(bankAt(tr, c.s + k))) * 0.88 / kk)); }
+  for (let k = 0; k <= 100; k += 10) { const kk = Math.abs(samp(tr, c.s + k).k); if (kk > 1e-4) vt = Math.min(vt, Math.sqrt((GRIP * tr.gripMul + 10 * Math.abs(bankAt(tr, c.s + k))) * 0.88 / kk)); }
   let nearJump = false;
-  for (const j of tr.jumps) { const dg = mod(j.gs - c.s, L); if (dg < 170) { vt = Math.max(vt, j.minV); nearJump = true; } }
-  for (const l of tr.segs) { const dg = mod(l.s0 - c.s, L); if (dg < 190 || dg > L - l.Ls - 5) { vt = Math.max(vt, l.minV + 3); nearJump = true; } }
-  if (c.inLoop || c.inCork) vt = Math.max(vt, 60);
+  for (const j of tr.jumps) {
+    const dg = mod(j.gs - c.s, L); if (dg < 170) { vt = Math.max(vt, j.minV); nearJump = true; }
+    if (j.minV > 50 && dg < 420) { vt = Math.max(vt, j.minV); nearJump = true; if (dg < 300) { inp.boost = true; if (c.isAI) c.boost = Math.max(c.boost, 40); } }
+  }
+  for (const l of tr.segs) {
+    const dg = mod(l.s0 - c.s, L);
+    if (l.kind === 'wall' && l.abs && l.H < 0) { if (dg < 260) { vt = Math.min(vt, l.aiV); nearJump = true; } continue; }
+    if (l.kind === 'wall' && l.abs && c.isAI && dg < 300) c.boost = Math.max(c.boost, 40);
+    if (l.kind === 'wall') { if (dg < 600 || dg > L - l.Ls - 5) { vt = 80; nearJump = true; if (dg < 140 || dg > L - l.Ls - 5) inp.boost = true; } continue; }
+    if (dg < 190 || dg > L - l.Ls - 5) { vt = Math.max(vt, l.minV + 3); nearJump = true; }
+  }
+  const cw = c.inWall ? sigOf(tr, c.s).wall : null;
+  if (c.inLoop || c.inCork || (cw && cw.H > 0)) { vt = Math.max(vt, 80); if (cw) inp.boost = true; }
+  if (cw && cw.abs && cw.H < 0) { inp.gas = false; inp.brake = false; inp.steer = 0; return inp; }
   let hold = false;
   for (const b of tr.bridges) {
     const dg = mod(b.s0 - c.s, L); if (dg > 220) continue;
+    if (b.leaf) { // liikkuva nostosilta: vauhti sen mukaan, missä kulmassa silta on perillä
+      const deg = bridgeAngle(b, TT + dg / Math.max(c.v, 12)) * 57.3;
+      vt = clamp(44 - 1.6 * (deg - 4), 26, 46); nearJump = true; continue;
+    }
     nearJump = true; const ve = Math.max(c.v, 14);
     const bad = bridgeAngle(b, TT + dg / ve) > 0.03 || bridgeAngle(b, TT + (dg + b.Lb + 6) / ve) > 0.03;
     if (bad) { if (dg < 60) hold = true; else vt = Math.min(vt, 16); }
@@ -743,12 +1038,12 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 const scene = new THREE.Scene();
 const FOG = 0xc4dcf2;
 scene.fog = new THREE.Fog(FOG, 350, 2700);
-const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 7000);
+const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 7000);
 
 function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); }
 window.addEventListener('resize', resize); resize();
 
-scene.add(new THREE.HemisphereLight(0xdcecff, 0x4d6b3a, 0.85));
+const hemi = new THREE.HemisphereLight(0xdcecff, 0x4d6b3a, 0.85); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(300, 600, 200); scene.add(sun);
 
 // taivaskupoli
@@ -760,37 +1055,126 @@ const sky = (() => {
   const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
   scene.add(m); return m;
 })();
+function setSky(hzHex, zenHex) {
+  const pos = sky.geometry.attributes.position, col = sky.geometry.attributes.color, hz = new THREE.Color(hzHex), zen = new THREE.Color(zenHex), c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) { const t = clamp(pos.getY(i) / 5000, 0, 1); c.copy(hz).lerp(zen, Math.pow(t, 0.55)); col.setXYZ(i, c.r, c.g, c.b); }
+  col.needsUpdate = true;
+}
 
 // maa
+const groundCv = document.createElement('canvas'); groundCv.width = groundCv.height = 64;
+let groundTex = null;
+function paintGround(c1, c2, line) {
+  const x = groundCv.getContext('2d');
+  x.fillStyle = c1; x.fillRect(0, 0, 64, 64); x.fillStyle = c2; x.fillRect(0, 0, 32, 32); x.fillRect(32, 32, 32, 32);
+  x.fillStyle = line; x.fillRect(0, 0, 64, 1); x.fillRect(0, 0, 1, 64);
+  if (groundTex) groundTex.needsUpdate = true;
+}
 (() => {
-  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d');
-  x.fillStyle = '#4e8a3b'; x.fillRect(0, 0, 64, 64); x.fillStyle = '#548f40'; x.fillRect(0, 0, 32, 32); x.fillRect(32, 32, 32, 32);
-  x.fillStyle = 'rgba(30,60,20,.35)'; x.fillRect(0, 0, 64, 1); x.fillRect(0, 0, 1, 64);
-  const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(9000 / 40, 9000 / 40);
+  paintGround('#4e8a3b', '#548f40', 'rgba(30,60,20,.35)'); const cv = groundCv;
+  const tex = groundTex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(9000 / 40, 9000 / 40);
   tex.magFilter = THREE.NearestFilter; tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const g = new THREE.PlaneGeometry(9000, 9000); g.rotateX(-Math.PI / 2);
   scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex })));
 })();
 
 // vuoret
+let mountains = null; const mountainTone = [];
 (() => {
   const rnd = mulberry(7);
   const geo = new THREE.ConeGeometry(1, 1, 5); geo.translate(0, 0.5, 0);
-  const m = new THREE.InstancedMesh(geo, new THREE.MeshPhongMaterial({ flatShading: true, shininess: 0, specular: 0x000000 }), 46);
+  const m = mountains = new THREE.InstancedMesh(geo, new THREE.MeshPhongMaterial({ flatShading: true, shininess: 0, specular: 0x000000 }), 46);
   const d = new THREE.Object3D(), c = new THREE.Color();
   for (let i = 0; i < 46; i++) {
     const a = i / 46 * Math.PI * 2 + rnd() * 0.1, r = 2300 + rnd() * 500, h = 140 + rnd() * 260;
     d.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); d.scale.set(220 + rnd() * 200, h, 220 + rnd() * 200); d.rotation.y = rnd() * 3; d.updateMatrix();
-    m.setMatrixAt(i, d.matrix); c.setHSL(0.6 + rnd() * 0.05, 0.18, 0.42 + rnd() * 0.12); m.setColorAt(i, c);
+    m.setMatrixAt(i, d.matrix); mountainTone.push([rnd() * 0.05, rnd() * 0.12]); c.setHSL(0.6 + mountainTone[i][0], 0.18, 0.42 + mountainTone[i][1]); m.setColorAt(i, c);
   }
   scene.add(m);
 })();
 
+// ---------- Sää ----------
+const WEATHER = {
+  clear: { name: 'Selkeä', icon: '☀️', fog: [0xc4dcf2, 350, 2700], hz: 0xd3e6f7, zen: 0x2f6cc4, hemi: [0xdcecff, 0x4d6b3a, 0.85], sun: [0xffffff, 0.75], ground: ['#4e8a3b', '#548f40', 'rgba(30,60,20,.35)'], mount: [0.6, 0.18, 0.42], tree: [0.27, 0.45, 0.22], lights: 0 },
+  night: { name: 'Yö', icon: '🌙', fog: [0x060a16, 90, 900], hz: 0x141c34, zen: 0x01020a, hemi: [0x46557f, 0x0b100a, 0.2], sun: [0x8fa2d6, 0.14], ground: ['#122016', '#152418', 'rgba(0,0,0,.4)'], mount: [0.63, 0.25, 0.1], tree: [0.3, 0.3, 0.07], lights: 3.2, stars: true },
+  snow: { name: 'Talvi', icon: '❄️', fog: [0xdde5ee, 120, 1200], hz: 0xe8edf3, zen: 0x8aa2c0, hemi: [0xffffff, 0xb6c3d2, 0.95], sun: [0xfff4e6, 0.5], ground: ['#e9eef4', '#dfe6ee', 'rgba(150,170,190,.35)'], mount: [0.6, 0.12, 0.86], tree: [0.4, 0.15, 0.62], lights: 0.5, fx: 'snow' },
+  rain: { name: 'Sade', icon: '🌧️', fog: [0x5f6973, 70, 850], hz: 0x7d8792, zen: 0x3e4750, hemi: [0xa9b3bf, 0x26331f, 0.62], sun: [0xd9e1ea, 0.22], ground: ['#2f4f29', '#34562d', 'rgba(10,20,10,.35)'], mount: [0.58, 0.08, 0.36], tree: [0.27, 0.35, 0.16], lights: 1.2, fx: 'rain', wet: true },
+  fog: { name: 'Sumu', icon: '🌫️', fog: [0xb4bbc2, 12, 165], hz: 0xbfc5cb, zen: 0xa3abb3, hemi: [0xe8ecf0, 0x67775f, 0.82], sun: [0xffffff, 0.28], ground: ['#5a7650', '#5f7b55', 'rgba(30,40,30,.3)'], mount: [0.6, 0.05, 0.7], tree: [0.27, 0.3, 0.3], lights: 1.0, reflectors: true },
+};
+WEATHER.night.reflectors = true;
+let curWx = WEATHER.clear;
+// tähdet ja kuu
+const stars = (() => {
+  const g = new THREE.BufferGeometry(), p = [], r = mulberry(99);
+  for (let i = 0; i < 1400; i++) { const u = r() * 2 - 1, a = r() * Math.PI * 2, y = Math.abs(u) * 0.9 + 0.05, rr = Math.sqrt(1 - y * y); p.push(Math.cos(a) * rr * 4500, y * 4500, Math.sin(a) * rr * 4500); }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 9, sizeAttenuation: true, fog: false, depthWrite: false }));
+  m.visible = false; scene.add(m); return m;
+})();
+const moon = new THREE.Mesh(new THREE.SphereGeometry(110, 20, 14), new THREE.MeshBasicMaterial({ color: 0xf4f1df, fog: false }));
+moon.visible = false; scene.add(moon);
+// sade ja lumi
+const FXN = 2400, FXB = 90;
+const fxPos = new Float32Array(FXN * 6), fxSeed = new Float32Array(FXN * 3);
+for (let i = 0; i < FXN; i++) { fxSeed[i * 3] = Math.random() * FXB; fxSeed[i * 3 + 1] = Math.random() * 60; fxSeed[i * 3 + 2] = Math.random() * FXB; }
+const rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute('position', new THREE.BufferAttribute(fxPos, 3));
+const rainFx = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xb8c6d6, transparent: true, opacity: 0.5 }));
+rainFx.frustumCulled = false; rainFx.visible = false; scene.add(rainFx);
+const snowPos = new Float32Array(FXN * 3), snowGeo = new THREE.BufferGeometry(); snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+const snowFx = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.32, transparent: true, opacity: 0.9 }));
+snowFx.frustumCulled = false; snowFx.visible = false; scene.add(snowFx);
+let fxT = 0;
+function updateWeatherFx(dt) {
+  fxT += dt; const cp = camera.position;
+  if (curWx.fx === 'rain') {
+    for (let i = 0; i < FXN; i++) {
+      const x = cp.x + mod(fxSeed[i * 3] - cp.x, FXB) - FXB / 2, z = cp.z + mod(fxSeed[i * 3 + 2] - cp.z, FXB) - FXB / 2;
+      const y = cp.y + 30 - mod(fxSeed[i * 3 + 1] + fxT * 42, 60);
+      fxPos.set([x, y, z, x + 0.25, y - 1.6, z + 0.1], i * 6);
+    }
+    rainGeo.attributes.position.needsUpdate = true;
+  } else if (curWx.fx === 'snow') {
+    for (let i = 0; i < FXN; i++) {
+      const sx = fxSeed[i * 3] + Math.sin(fxT * 0.7 + i) * 1.2, sz = fxSeed[i * 3 + 2] + fxT * 2.5;
+      snowPos[i * 3] = cp.x + mod(sx - cp.x, FXB) - FXB / 2;
+      snowPos[i * 3 + 1] = cp.y + 30 - mod(fxSeed[i * 3 + 1] + fxT * 3.2, 60);
+      snowPos[i * 3 + 2] = cp.z + mod(sz - cp.z, FXB) - FXB / 2;
+    }
+    snowGeo.attributes.position.needsUpdate = true;
+  }
+  stars.position.copy(cp); moon.position.set(cp.x - 2600, cp.y + 1700, cp.z - 2900);
+}
+function applyWeather(key) {
+  const w = curWx = WEATHER[key] || WEATHER.clear;
+  scene.fog.color.setHex(w.fog[0]); scene.fog.near = w.fog[1]; scene.fog.far = w.fog[2];
+  setSky(w.hz, w.zen);
+  hemi.color.setHex(w.hemi[0]); hemi.groundColor.setHex(w.hemi[1]); hemi.intensity = w.hemi[2];
+  sun.color.setHex(w.sun[0]); sun.intensity = w.sun[1];
+  paintGround(...w.ground);
+  const c = new THREE.Color();
+  for (let i = 0; i < 46; i++) { c.setHSL(w.mount[0] + mountainTone[i][0], w.mount[1], w.mount[2] + mountainTone[i][1] * (key === 'night' ? 0.3 : 1)); mountains.setColorAt(i, c); }
+  mountains.instanceColor.needsUpdate = true;
+  stars.visible = moon.visible = !!w.stars;
+  rainFx.visible = w.fx === 'rain'; snowFx.visible = w.fx === 'snow';
+  for (const m of [pMesh, aMesh]) { m.head.intensity = w.lights; m.head.visible = w.lights > 0; }
+}
+
 function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 // ---------- Radan rakentaminen ----------
-let trackGroup = null, bridgeVis = [];
-function updateBridges() { for (const v of bridgeVis) { v.piv.rotation.x = -bridgeAngle(v.b, TT); const w = bridgeWarn(v.b, TT); v.lamps.forEach(l => l.material.color.setHex(w ? ((TT * 3) % 1 < 0.5 ? 0xff2a1a : 0x551008) : 0x33ff55)); } }
+let trackGroup = null, bridgeVis = [], bridgeCables = {};
+function updateBridges() {
+  bridgeVis.forEach((v, i) => {
+    const cs = bridgeCables[i]; if (!cs) return; const a = bridgeAngle(v.b, TT);
+    for (const c of cs) {
+      const top = new V3(c.sm.x + c.sm.rx * c.sg * (HALF + 1.2), c.h + c.towerH - 0.5, c.sm.z + c.sm.rz * c.sg * (HALF + 1.2));
+      const fx = Math.sin(c.sm.hd), fz = Math.cos(c.sm.hd), L = v.leafLen * Math.cos(a), off = c.sg * (HALF - 0.4);
+      const tip = new V3(c.sm.x + fx * L + c.sm.rx * off, c.h + v.leafLen * Math.sin(a), c.sm.z + fz * L + c.sm.rz * off);
+      c.cab.position.copy(top).add(tip).multiplyScalar(0.5); c.cab.scale.set(1, top.distanceTo(tip), 1);
+      c.cab.quaternion.setFromUnitVectors(new V3(0, 1, 0), tip.clone().sub(top).normalize());
+    }
+  });
+  for (const v of bridgeVis) { v.piv.rotation.x = -bridgeAngle(v.b, TT); const w = bridgeWarn(v.b, TT); v.lamps.forEach(l => l.material.color.setHex(w ? ((TT * 3) % 1 < 0.5 ? 0xff2a1a : 0x551008) : 0x33ff55)); } }
 function disposeGroup(g) { g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(mm => { if (mm.map) mm.map.dispose(); mm.dispose(); }); } }); }
 
 function buildTrackMeshes(tr, seed) {
@@ -799,7 +1183,7 @@ function buildTrackMeshes(tr, seed) {
   const P = [], C = [];
   const push = (p, c) => { P.push(p[0], p[1], p[2]); C.push(c.r, c.g, c.b); };
   const quad = (a, b, c, d, col) => { push(a, col); push(b, col); push(c, col); push(a, col); push(c, col); push(d, col); };
-  const roadA = new THREE.Color(0x6b6e7c), roadB = new THREE.Color(0x5b5e6b), kerbA = new THREE.Color(0xd6382c), kerbB = new THREE.Color(0xf0f0f0),
+  const wxk = tr.weather, roadA = new THREE.Color(wxk === 'snow' ? 0xa7afbb : wxk === 'rain' ? 0x4c4f5a : 0x6b6e7c), roadB = new THREE.Color(wxk === 'snow' ? 0x98a1ae : wxk === 'rain' ? 0x42454f : 0x5b5e6b), kerbA = new THREE.Color(0xd6382c), kerbB = new THREE.Color(0xf0f0f0),
     side = new THREE.Color(0x3b3e48), under = new THREE.Color(0x2a2c34), chkW = new THREE.Color(0xffffff), chkB = new THREE.Color(0x111111);
   const KB = 0.9, TH = 0.6;
   const pt = (s, o, dy) => {
@@ -832,7 +1216,19 @@ function buildTrackMeshes(tr, seed) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
   g.computeVertexNormals();
-  trackGroup.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })));
+  const wet = tr.weather === 'rain';
+  trackGroup.add(new THREE.Mesh(g, new THREE.MeshPhongMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, shininess: wet ? 60 : 4, specular: wet ? 0x5a6470 : 0x0a0a0a })));
+  // heijastimet radan reunoilla (yö ja sumu)
+  if (WEATHER[tr.weather] && WEATHER[tr.weather].reflectors) {
+    const rm = [], dd = new THREE.Object3D();
+    for (let s = 2; s < tr.L; s += 9) {
+      const g2 = sigOf(tr, s); if (g2.loop || g2.cork || g2.wall || inBridgeZone(tr, s)) continue;
+      const h = heightAt(tr, s); if (tr.gap) continue; const sm = samp(tr, s);
+      for (const sg of [-1, 1]) { const o = sg * (HALF - 0.3); dd.position.set(sm.x + sm.lx * o, h + bankAt(tr, s) * o + 0.12, sm.z + sm.lz * o); dd.rotation.set(0, sm.hd, 0); dd.scale.set(0.22, 0.12, 0.5); dd.updateMatrix(); rm.push(dd.matrix.clone()); }
+    }
+    const refl = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffb020 }), rm.length);
+    rm.forEach((m, i) => refl.setMatrixAt(i, m)); trackGroup.add(refl);
+  }
 
   // teräsristikko
   const mats = [], d = new THREE.Object3D();
@@ -847,7 +1243,7 @@ function buildTrackMeshes(tr, seed) {
     return false;
   };
   const station = s => {
-    for (const q of [s - 3, s, s + 3]) { const g = sigOf(tr, q); if (g.loop || g.cork) return null; }
+    for (const q of [s - 3, s, s + 3]) { const g = sigOf(tr, q); if (g.loop || g.cork || g.wall) return null; }
     if (inBridgeZone(tr, s + 2) || inBridgeZone(tr, s - 2)) return null;
     const h = heightAt(tr, s); if (tr.gap) return null;
     const bk = bankAt(tr, s), top = h - TH; const sm = samp(tr, s); const o = HALF - 0.7;
@@ -891,8 +1287,21 @@ function buildTrackMeshes(tr, seed) {
     }
   }
 
+  // seinämien tukirakenne: pystypalkit maasta seinän alle
+  for (const w of tr.segs) {
+    if (w.kind !== 'wall') continue;
+    for (let r = 6; r < w.Ls; r += 9) {
+      const s = w.s0 + r, h = heightAt(tr, s), sm = samp(tr, s);
+      for (const sg of [-1, 1]) {
+        const o = sg * (HALF - 0.8), px = sm.x + sm.lx * o - sm.nx * 0.8, py = h - sm.ny * 0.8, pz = sm.z + sm.lz * o - sm.nz * 0.8;
+        if (py < 1) continue;
+        const col = new THREE.Mesh(new THREE.BoxGeometry(0.7, py, 0.7), steelMatAll); col.position.set(px, py / 2, pz); col.rotation.y = sm.hd; trackGroup.add(col);
+      }
+    }
+  }
+
   // nostosillat
-  bridgeVis = [];
+  bridgeVis = []; bridgeCables = {};
   const hz = document.createElement('canvas'); hz.width = 64; hz.height = 128; const hx = hz.getContext('2d');
   hx.fillStyle = '#676a76'; hx.fillRect(0, 0, 64, 128);
   for (let y = 0; y < 128; y += 16) { hx.fillStyle = '#ffcc00'; hx.fillRect(0, y, 7, 8); hx.fillRect(57, y + 8, 7, 8); hx.fillStyle = '#111'; hx.fillRect(0, y + 8, 7, 8); hx.fillRect(57, y, 7, 8); }
@@ -901,18 +1310,27 @@ function buildTrackMeshes(tr, seed) {
   const leafMat = [new THREE.MeshLambertMaterial({ color: 0x3b3e48 }), new THREE.MeshLambertMaterial({ color: 0x3b3e48 }), new THREE.MeshLambertMaterial({ map: leafTex }), new THREE.MeshLambertMaterial({ color: 0x2a2c34 }), new THREE.MeshLambertMaterial({ color: 0xffcc00 }), new THREE.MeshLambertMaterial({ color: 0xffcc00 })];
   for (const b of tr.bridges) {
     const lamps = [];
-    for (const [sAt, flip] of [[b.s0, 0], [b.s1, Math.PI]]) {
+    const ends = b.leaf ? [[b.s0, 0]] : [[b.s0, 0], [b.s1, Math.PI]], leafLen = b.leaf || b.Lb / 2, towerH = b.leaf ? 26 : 9;
+    for (const [sAt, flip] of ends) {
       const h = heightAt(tr, sAt + (flip ? 0.05 : -0.05)); const sm = samp(tr, sAt);
       const piv = new THREE.Group(); piv.rotation.order = 'YXZ'; piv.position.set(sm.x, h, sm.z); piv.rotation.y = sm.hd + flip;
-      const leaf = new THREE.Mesh(new THREE.BoxGeometry(2 * HALF, 0.6, b.Lb / 2), leafMat); leaf.position.set(0, -0.3, b.Lb / 4); piv.add(leaf);
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(2 * HALF, b.leaf ? 1.0 : 0.6, leafLen), leafMat); leaf.position.set(0, b.leaf ? -0.5 : -0.3, leafLen / 2); piv.add(leaf);
+      if (b.leaf) { // vastapaino ja nostovaijerit
+        const cw = new THREE.Mesh(new THREE.BoxGeometry(2 * HALF + 1, 3, 4), new THREE.MeshLambertMaterial({ color: 0x3a3e4a })); cw.position.set(0, -2.2, -3); piv.add(cw);
+      }
       trackGroup.add(piv);
       for (const sg of [-1, 1]) {
-        const tw = new THREE.Mesh(new THREE.BoxGeometry(0.9, h + 9, 0.9), postM);
-        tw.position.set(sm.x + sm.rx * sg * (HALF + 1), (h + 9) / 2, sm.z + sm.rz * sg * (HALF + 1)); tw.rotation.y = sm.hd; trackGroup.add(tw);
-        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), new THREE.MeshBasicMaterial({ color: 0x33ff55 }));
-        lamp.position.set(tw.position.x, h + 9.6, tw.position.z); trackGroup.add(lamp); lamps.push(lamp);
+        const tw = new THREE.Mesh(new THREE.BoxGeometry(b.leaf ? 1.6 : 0.9, h + towerH, b.leaf ? 1.6 : 0.9), postM);
+        tw.position.set(sm.x + sm.rx * sg * (HALF + 1.2), (h + towerH) / 2, sm.z + sm.rz * sg * (HALF + 1.2)); tw.rotation.y = sm.hd; trackGroup.add(tw);
+        const lamp = new THREE.Mesh(new THREE.SphereGeometry(b.leaf ? 1.0 : 0.7, 10, 8), new THREE.MeshBasicMaterial({ color: 0x33ff55 }));
+        lamp.position.set(tw.position.x, h + towerH + 0.8, tw.position.z); trackGroup.add(lamp); lamps.push(lamp);
       }
-      bridgeVis.push({ b, piv, lamps });
+      if (b.leaf) {
+        const top = new THREE.Mesh(new THREE.BoxGeometry(2 * HALF + 4, 1.4, 1.6), postM); top.position.set(sm.x, h + towerH - 0.7, sm.z); top.rotation.y = sm.hd; trackGroup.add(top);
+        // kaapelit tornista lehden kärkeen
+        for (const sg of [-1, 1]) { const cab = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1, 5), new THREE.MeshLambertMaterial({ color: 0x22242b })); trackGroup.add(cab); (bridgeCables[bridgeVis.length] = bridgeCables[bridgeVis.length] || []).push({ cab, sg, sm: { x: sm.x, z: sm.z, hd: sm.hd, rx: sm.rx, rz: sm.rz }, h, towerH }); }
+      }
+      bridgeVis.push({ b, piv, lamps, leafLen });
     }
   }
 
@@ -942,13 +1360,13 @@ function buildTrackMeshes(tr, seed) {
     let ok = true; for (let j = 0; j < tr.N; j += 6) { const dx = tr.X[j] - x, dz = tr.Z[j] - z; if (dx * dx + dz * dz < 400) { ok = false; break; } }
     if (!ok) continue;
     const sc = 0.7 + rnd() * 0.8; d.position.set(x, 0, z); d.rotation.set(0, rnd() * 3, 0); d.scale.set(sc, sc * (0.8 + rnd() * 0.5), sc); d.updateMatrix();
-    trees.setMatrixAt(placed, d.matrix); c.setHSL(0.27 + rnd() * 0.07, 0.45, 0.22 + rnd() * 0.1); trees.setColorAt(placed, c); placed++;
+    const tw = (WEATHER[tr.weather] || WEATHER.clear).tree; trees.setMatrixAt(placed, d.matrix); c.setHSL(tw[0] + rnd() * 0.07, tw[1], tw[2] + rnd() * 0.1); trees.setColorAt(placed, c); placed++;
   }
   trees.count = placed; trackGroup.add(trees);
 }
 
 // ---------- Autot ----------
-function makeCar(color, accent) {
+function makeCar(color, accent, withCockpit) {
   const root = new THREE.Group(); root.rotation.order = 'YXZ';
   const body = new THREE.Group(); root.add(body);
   const lam = c => new THREE.MeshPhongMaterial({ color: c, flatShading: true, shininess: 18, specular: 0x222222 });
@@ -957,7 +1375,9 @@ function makeCar(color, accent) {
   add(new THREE.BoxGeometry(1.7, 0.32, 3.5), mBody, 0, 0.6, 0);
   const nose = add(new THREE.BoxGeometry(1.4, 0.24, 1.0), mBody, 0, 0.64, 2.05); nose.rotation.x = 0.18;
   add(new THREE.BoxGeometry(1.75, 0.1, 0.35), mAcc, 0, 0.55, 2.55);
-  add(new THREE.BoxGeometry(1.2, 0.35, 1.2), mDark, 0, 0.85, 0.2);
+  // ohjaamon allas: pelaajan autossa matala lattia, jotta ratti ja kojelauta eivät jää kopan sisään
+  if (withCockpit) add(new THREE.BoxGeometry(1.5, 0.06, 1.5), mDark, 0, 0.78, 0.15);
+  else add(new THREE.BoxGeometry(1.2, 0.35, 1.2), mDark, 0, 0.85, 0.2);
   add(new THREE.BoxGeometry(0.85, 0.5, 0.95), mChrome, 0, 0.98, -1.15);
   add(new THREE.BoxGeometry(0.4, 0.3, 0.5), mDark, 0, 1.35, -1.05);
   for (const sx of [-1, 1]) { const ex = add(new THREE.CylinderGeometry(0.08, 0.1, 0.9, 6), mChrome, sx * 0.3, 0.8, -1.95); ex.rotation.x = Math.PI / 2; }
@@ -990,11 +1410,68 @@ function makeCar(color, accent) {
   const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 60, 4), mDark); wire.position.y = 31.8; cable.add(wire);
   const hook = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.5), mAcc); hook.position.y = 1.9; cable.add(hook);
   cable.visible = false; root.add(cable);
+  // ajovalot: lamput ja kohdevalo (yöllä, sateessa ja sumussa)
+  for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.28, 0.16, 0.06), new THREE.MeshBasicMaterial({ color: 0xfff3c4 }), sx * 0.5, 0.7, 2.56);
+  const head = new THREE.SpotLight(0xfff1cc, 0, 170, 0.5, 0.55, 1.2); head.position.set(0, 1.0, 2.4);
+  const headT = new THREE.Object3D(); headT.position.set(0, -1.5, 30); body.add(head); body.add(headT); head.target = headT; head.visible = false;
   scene.add(root); scene.add(shadow);
-  return { root, body, wheels, pivots, shadow, cable, mBody, mAcc };
+  // pakoputket keulan molemmin puolin, turbolla niistä syöksyy liekkiä
+  const flames = [];
+  const UP = 0.62; // ulostulon kulma: yläviistoon taaksepäin (~35°)
+  // kaksi putkea kummallakin puolella vierekkäin; ulostulot kuljettajan sivuilla, jotta liekit näkyvät myös ohjaamosta
+  for (const sx of [-1, 1]) for (const [px, z0] of [[0.86, 0.88], [1.03, 1.06]]) {
+    const x = sx * px;
+    const FRONT = 1.3; // putket loppuvat ennen etupyöriä, jotta pyörät näkyvät ohjaamosta
+    const pipe = add(new THREE.CylinderGeometry(0.07, 0.07, FRONT - z0, 10), mChrome, x, 1.03, (FRONT + z0) / 2); pipe.rotation.x = Math.PI / 2;
+    add(new THREE.SphereGeometry(0.07, 10, 8), mChrome, x, 1.03, FRONT);
+    const dy = Math.sin(UP), dz = -Math.cos(UP);
+    const tip = add(new THREE.CylinderGeometry(0.08, 0.095, 0.5, 10), mChrome, x, 1.03 + dy * 0.25, z0 + dz * 0.25); tip.rotation.x = UP - Math.PI / 2;
+    const fl = new THREE.Group(); fl.rotation.order = 'YXZ'; fl.position.set(x, 1.03 + dy * 0.5, z0 + dz * 0.5); fl.rotation.set(-UP, Math.PI, 0); body.add(fl);
+    for (const [r, h, col, op] of [[0.14, 1.4, 0xff5a10, 0.7], [0.08, 0.9, 0xffe060, 0.9]]) {
+      const g = new THREE.ConeGeometry(r, h, 10, 1, true); g.translate(0, h / 2, 0); g.rotateX(Math.PI / 2);
+      fl.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })));
+    }
+    fl.visible = false; flames.push(fl);
+  }
+  // ohjaamo: kojelauta, mittarit, ratti, vaihdekeppi, istuin ja sivupaneelit (näkyvät ohjaamonäkymässä)
+  let steerWheel = null, speedNeedle = null, revNeedle = null; const ckStart = body.children.length;
+  if (withCockpit) {
+    const mDash = lam(0x1b1d23), mTrim = lam(0x2e3139), mGrip = lam(0x111114), mMetal = lam(0x9aa0ab);
+    const dash = add(new THREE.BoxGeometry(1.1, 0.2, 0.3), mDash, 0, 0.89, 0.78); dash.rotation.x = -0.25;
+    add(new THREE.BoxGeometry(1.12, 0.04, 0.36), mTrim, 0, 1.0, 0.8);                       // kojelaudan yläreuna
+    for (const sx of [-1, 1]) add(new THREE.BoxGeometry(0.08, 0.2, 1.15), mBody, sx * 0.78, 0.9, -0.18); // sivupaneelit loppuvat kuljettajan kohdalle // sivupaneelit
+    add(new THREE.BoxGeometry(0.52, 0.08, 0.5), mTrim, 0, 0.92, -0.25);                       // istuin
+    add(new THREE.BoxGeometry(0.52, 0.55, 0.1), mTrim, 0, 1.18, -0.5);                        // selkänoja
+    // mittarit
+    const face = new THREE.MeshBasicMaterial({ color: 0xf2f2e6 }), ring = new THREE.MeshBasicMaterial({ color: 0x0b0b0e }), needleM = new THREE.MeshBasicMaterial({ color: 0xff3a1a });
+    const gauge = (x, y, r) => {
+      const g = new THREE.Group(); g.position.set(x, y, 0.64); g.rotation.x = -0.25; body.add(g);
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(r + 0.012, r + 0.012, 0.02, 20), ring); rim.rotation.x = Math.PI / 2; g.add(rim);
+      const fc = new THREE.Mesh(new THREE.CircleGeometry(r, 20), face); fc.rotation.y = Math.PI; fc.position.z = -0.012; g.add(fc);
+      const nd = new THREE.Group(); nd.position.z = -0.016; g.add(nd);
+      const bar = new THREE.Mesh(new THREE.PlaneGeometry(0.008, r * 0.9), needleM); bar.position.y = r * 0.42; bar.rotation.y = Math.PI; nd.add(bar);
+      return nd;
+    };
+    speedNeedle = gauge(0.27, 0.9, 0.07); revNeedle = gauge(-0.27, 0.9, 0.07); gauge(0.44, 0.89, 0.04); gauge(-0.44, 0.89, 0.04);
+    // ohjauspylväs ja ratti
+    const col = add(new THREE.CylinderGeometry(0.03, 0.035, 0.34, 8), mMetal, 0, 0.97, 0.58); col.rotation.x = Math.PI / 2 - 0.35;
+    const sw = new THREE.Group(); sw.position.set(0, 1.04, 0.42); sw.rotation.x = -0.35; body.add(sw);
+    steerWheel = new THREE.Group(); sw.add(steerWheel);
+    steerWheel.add(new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.024, 8, 28), mGrip));
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 12), mAcc); hub.rotation.x = Math.PI / 2; steerWheel.add(hub);
+    for (const a of [0, 2.1, -2.1]) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.17, 0.015), mMetal); sp.position.set(Math.sin(a) * 0.09, Math.cos(a) * -0.09, 0); sp.rotation.z = -a; steerWheel.add(sp); }
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, 0.03), mAcc); mark.position.set(0, 0.19, 0); steerWheel.add(mark); // keskimerkki
+    // vaihdekeppi
+    const lever = add(new THREE.CylinderGeometry(0.012, 0.012, 0.26, 6), mMetal, 0.3, 1.0, 0.1); lever.rotation.x = 0.25;
+    add(new THREE.SphereGeometry(0.035, 10, 8), mGrip, 0.3, 1.13, 0.13);
+  }
+  // ohjaamonäkymää varten: kuljettajan takana olevat osat ja kojelaudan/ratin osat
+  const interior = withCockpit ? body.children.slice(ckStart).filter(o => o.position.z > 0.2) : [];
+  const rear = body.children.filter(o => o.position.z < -0.3 || (o.position.y > 1.5 && o.position.z < 0));
+  return { root, body, wheels, pivots, shadow, cable, mBody, mAcc, steerWheel, speedNeedle, revNeedle, flames, head, interior, rear };
 }
 
-const pMesh = makeCar(0xd8262b, 0xffcc00);
+const pMesh = makeCar(0xd8262b, 0xffcc00, true);
 const aMesh = makeCar(0x1f5fd6, 0xe9eef7);
 
 function placeCar(c, m, dt) {
@@ -1003,17 +1480,26 @@ function placeCar(c, m, dt) {
   m.body.position.y = c.susp;
   m.cable.visible = c.state === 'crane';
   if (c.state === 'drive') {
-    const sm = samp(track, c.s); const x = sm.x + sm.lx * c.d, z = sm.z + sm.lz * c.d, th = sm.hd - c.psi;
+    // pehmennetty sivusijainti ja suunta: törmäysten pienet nykäykset eivät tärise ruudulla
+    if (c.dVis === undefined || Math.abs(c.d - c.dVis) > 3) { c.dVis = c.d; c.psiVis = c.psi; }
+    const kf = Math.min(1, dt * 14); c.dVis += (c.d - c.dVis) * kf; c.psiVis += (c.psi - c.psiVis) * kf;
+    const sm = samp(track, c.s); const x = sm.x + sm.lx * c.dVis, z = sm.z + sm.lz * c.dVis, th = sm.hd - c.psiVis;
     m.root.position.set(x, c.y, z);
     const roll = c.inCork ? -c.corkTh : -Math.atan(bankAt(track, c.s));
     m.root.rotation.set(-c.pitch, th, roll + clamp(c.steer * c.v * 0.0015, -0.05, 0.05));
     c.wheelRot += c.v * dt / 0.48;
     m.pivots.forEach(p => p.rotation.y = -c.steer * 0.38);
+    if (m.steerWheel) {
+      m.steerWheel.rotation.z = c.steer * 1.6;
+      const v = Math.abs(c.v), gear = Math.min(4, Math.floor(v / 15));
+      m.speedNeedle.rotation.z = 2.2 - clamp(v * 3.6 / 260, 0, 1) * 4.4;
+      m.revNeedle.rotation.z = 2.2 - clamp(0.15 + ((v - gear * 15) / 15) * 0.75 + (c.gas && !c.grounded ? 0.15 : 0), 0, 1) * 4.4;
+    }
     // varjo
     const hS = heightAt(track, c.s), onDeck = !track.gap && Math.abs(c.d) < HALF;
     const sy = onDeck ? hS + bankAt(track, c.s) * c.d : 0;
     const rel = c.y - sy;
-    m.shadow.visible = rel > -0.5 && rel < 40 && !c.inLoop && !c.inCork;
+    m.shadow.visible = rel > -0.5 && rel < 40 && !c.inLoop && !c.inCork && !c.inWall;
     m.shadow.position.set(x, sy + 0.05, z);
     m.shadow.rotation.set(onDeck ? -Math.atan(slopeAt(track, c.s)) : 0, th, onDeck ? roll : 0);
     m.shadow.material.opacity = clamp(1 - rel / 25, 0.15, 1);
@@ -1028,20 +1514,22 @@ function placeCar(c, m, dt) {
     m.shadow.visible = false;
   }
   m.wheels.forEach(w => w.rotation.x = c.wheelRot);
+  const burn = c.boosting && c.state === 'drive';
+  m.flames.forEach(f => { f.visible = burn; if (burn) { const k = 0.65 + Math.random() * 0.6; f.scale.set(0.8 + Math.random() * 0.4, 0.8 + Math.random() * 0.4, k); } });
 }
 
 // ---------- Tila ----------
-let player = null, ai = null, trackIdx = 0, diffIdx = 1, gameState = 'menu', raceTime = 0, countT = 0, camMode = 'chase';
+let player = null, ai = null, trackIdx = 0, diffIdx = 1, gameState = 'menu', raceTime = 0, countT = 0, camMode = 'cockpit'; // peli alkaa aina ohjaamonäkymästä
 let resultShown = false, endTimer = 0, finishOrder = [];
 const builtTracks = TRACKS.map(() => null);
 const getTrack = i => builtTracks[i] || (builtTracks[i] = buildTrack(TRACKS[i]));
-const bestKey = i => 'taivasrata-paras-' + i;
+const bestKey = i => 'taivasrata-paras-' + (TRACKS[i].key || i);
 function loadBest(i) { try { const v = localStorage.getItem(bestKey(i)); return v ? parseFloat(v) : null; } catch (e) { return null; } }
 function saveBest(i, t) { try { localStorage.setItem(bestKey(i), String(t)); } catch (e) {} }
 const fmt = t => { if (t == null || !isFinite(t)) return '–'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
 
 function setupRace(idx) {
-  trackIdx = idx; useTrack(getTrack(idx));
+  trackIdx = idx; useTrack(getTrack(idx)); applyWeather(track.weather);
   buildTrackMeshes(track, idx + 1);
   player = newCar(false, track.L - 10, -3); ai = newCar(true, track.L - 10, 3); ai.lane = 2.5;
   raceTime = 0; finishOrder = []; resultShown = false; endTimer = 0;
@@ -1073,7 +1561,9 @@ function initAudio() {
     const ns = actx.createBufferSource(); ns.buffer = buf; ns.loop = true;
     const nf = actx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 2200; const ng = actx.createGain(); ng.gain.value = 0;
     ns.connect(nf); nf.connect(ng); ng.connect(master); ns.start();
-    eng = { o1, o2, f, g, ng, buf };
+    const rs = actx.createBufferSource(); rs.buffer = buf; rs.loop = true; const rf = actx.createBiquadFilter(); rf.type = 'lowpass'; rf.frequency.value = 1400;
+    const rg = actx.createGain(); rg.gain.value = 0; rs.connect(rf); rf.connect(rg); rg.connect(master); rs.start();
+    eng = { o1, o2, f, g, ng, buf, rg };
   } catch (e) { actx = null; }
 }
 function burst(type, freq, gain, dur) {
@@ -1097,6 +1587,7 @@ function updateAudio() {
   eng.f.frequency.setTargetAtTime(500 + v * 18, t, 0.1);
   eng.g.gain.setTargetAtTime(on ? (player.gas ? 0.09 : 0.05) : 0, t, 0.08);
   eng.ng.gain.setTargetAtTime(on && player.boosting ? 0.07 : 0, t, 0.05);
+  eng.rg.gain.setTargetAtTime(curWx.fx === 'rain' && gameState !== 'menu' && gameState !== 'champ' ? 0.06 : 0, t, 0.3);
 }
 function toggleMute() { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.8; $('muteBtn').textContent = muted ? '🔇' : '🔊'; }
 
@@ -1135,8 +1626,13 @@ function syncAutoGas() { $('autoGasBtn').setAttribute('aria-pressed', autoGas); 
 $('autoGasBtn').onclick = () => { autoGas = !autoGas; try { localStorage.setItem('taivasrata-autokaasu', autoGas ? '1' : '0'); } catch (e) {} syncAutoGas(); };
 syncAutoGas();
 const buzz = ms => { if (touchMode && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} };
+function setTouchVisible(v) { $('touch').classList.toggle('on', !!v); }
 document.querySelectorAll('.tb').forEach(el => {
   const k = el.dataset.k;
+  if (k === 'cam') { // kuvakulman vaihto kosketusnapista
+    el.addEventListener('pointerdown', e => { e.preventDefault(); toggleCam(); buzz(8); el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 150); });
+    el.addEventListener('contextmenu', e => e.preventDefault()); return;
+  }
   const on = e => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_) {} touch[k] = true; el.classList.add('on'); initAudio(); buzz(8); };
   const off = e => { e.preventDefault(); touch[k] = false; el.classList.remove('on'); };
   el.addEventListener('pointerdown', on); el.addEventListener('pointerup', off); el.addEventListener('pointercancel', off); el.addEventListener('lostpointercapture', off);
@@ -1166,7 +1662,6 @@ function toggleCam() {
   try { localStorage.setItem('taivasrata-nakyma', camMode); } catch (e) {}
   $('camBtn').setAttribute('aria-pressed', camMode === 'cockpit');
 }
-try { if (localStorage.getItem('taivasrata-nakyma') === 'cockpit') camMode = 'cockpit'; } catch (e) {}
 $('camBtn').setAttribute('aria-pressed', camMode === 'cockpit');
 const hudEl = $('hud');
 $('camBtn').onclick = toggleCam; $('muteBtn').onclick = toggleMute; $('pauseBtn').onclick = () => togglePause();
@@ -1175,9 +1670,9 @@ $('camBtn').onclick = toggleCam; $('muteBtn').onclick = toggleMute; $('pauseBtn'
 const camPos = new V3(); let camInit = true, menuAng = 0;
 const tmpA = new V3(), tmpB = new V3(), tmpU = new V3();
 let camBlend = 0;
-const chaseLook = new V3(), chaseUp = new V3(0, 1, 0), ckPos = new V3(), ckLook = new V3(), ckUp = new V3();
+const chaseLook = new V3(), chaseUp = new V3(0, 1, 0), ckPos = new V3(), ckLook = new V3(), ckUp = new V3(), tmpC = new V3(); let ckDip = 0, ckHide = 0, ckNeedAir = 0;
 function updateCamera(dt) {
-  const c = player, m = pMesh, drive = c.state === 'drive', special = c.inLoop || c.inCork;
+  const c = player, m = pMesh, drive = c.state === 'drive', special = c.inLoop || c.inCork || c.inWall;
   // ohjaamonäkymä <-> takanäkymä liukuvalla zoomauksella
   const tgt = camMode === 'cockpit' && drive ? 1 : 0;
   camBlend += clamp(tgt - camBlend, -dt * 2.2, dt * 2.2);
@@ -1194,22 +1689,51 @@ function updateCamera(dt) {
     chaseLook.set(0, 0.9, 5).applyMatrix4(mw);
     tmpU.set(0, 1, 0).applyQuaternion(m.root.quaternion);
   } else {
-    const th = drive ? samp(track, c.s).hd - c.psi : (c.state === 'crane' ? m.root.rotation.y : c.fyaw);
+    const th = drive ? samp(track, c.s).hd - (c.psiVis ?? c.psi) : (c.state === 'crane' ? m.root.rotation.y : c.fyaw);
     const fx = Math.sin(th), fz = Math.cos(th), p = m.root.position;
     tmpA.set(p.x - fx * 10.5, p.y + 4.2, p.z - fz * 10.5);
     if (c.state === 'fall') tmpA.copy(camPos);
+    // kamera ei saa painua radan alle: katselinjan autosta kameraan pitää kulkea radan yläpuolella
+    let minY = 1.5;
+    if (drive) {
+      const eye = p.y + 1.4;
+      for (let db = 2; db <= 12; db += 2) {
+        const sb = c.s - db * Math.cos(c.psi), g = sigOf(track, sb); if (g.loop || g.cork) continue;
+        const hb = heightAt(track, sb) + Math.abs(bankAt(track, sb)) * HALF + 1.6, t = Math.min(1, db / 10.5);
+        minY = Math.max(minY, eye + (hb - eye) / t, hb + 0.8);
+      }
+      minY = Math.min(minY, p.y + 30);
+      if (tmpA.y < minY) tmpA.y = minY;
+    }
     if (camInit) { camPos.copy(tmpA); camInit = false; }
     else camPos.lerp(tmpA, 1 - Math.exp(-dt * (drive ? 6 : 2)));
+    if (camPos.y < minY) camPos.y = minY; // varmistus myös pehmennyksen jälkeen
     chaseLook.set(p.x + fx * 4, p.y + 1.4, p.z + fz * 4);
     tmpU.set(0, 1, 0);
   }
   chaseUp.lerp(tmpU, Math.min(1, dt * 10)).normalize();
   // ohjaamo: kuljettajan silmät turvakaaren alla, konepelti ja etupyörät näkyvissä
   if (drive) {
-    ckPos.set(0, 1.3 + c.susp, -0.25).applyMatrix4(mw);
-    ckLook.set(0, 1.0 + c.susp, 14).applyMatrix4(mw);
+    // varmistus: jos rata edessä painuu kojelaudan taakse (hypyt, harjanteet), nosta katsetta ja kallista alas
+    let need = 0; ckNeedAir = 0;
+    if (!special) {
+      const sa = samp(track, c.s + 28), ha = heightAt(track, c.s + 28) + 0.4;
+      tmpC.set(sa.x + sa.lx * c.d, ha, sa.z + sa.lz * c.d); m.root.worldToLocal(tmpC);
+      const phi = Math.atan2(tmpC.y - (1.36 + c.susp), Math.max(2, tmpC.z + 0.25));
+      need = clamp(-0.13 - phi, 0, 0.9);
+      if (!c.grounded) { ckNeedAir = need; need = 0; } // ilmassa katse pysyy auton suunnassa (inertia)
+    }
+    ckDip += (need - ckDip) * Math.min(1, dt * 8);
+    const raise = Math.min(1.8, ckDip * 4);
+    ckPos.set(0, 1.36 + c.susp + raise, -0.25).applyMatrix4(mw);
+    ckLook.set(0, 1.0 + c.susp + raise - Math.tan(ckDip) * 14.25, 14).applyMatrix4(mw);
     ckUp.set(0, 1, 0).applyQuaternion(m.root.quaternion);
-  } else { ckPos.copy(camPos); ckLook.copy(chaseLook); ckUp.copy(chaseUp); }
+  } else { ckDip = 0; ckNeedAir = 0; ckPos.copy(camPos); ckLook.copy(chaseLook); ckUp.copy(chaseUp); }
+  // ohjaamossa piilotetaan takaosat (eivät koskaan peitä näkymää) ja kojelauta/ratti kun katse joudutaan laskemaan
+  const inCk = camBlend > 0.04;
+  m.rear.forEach(o => o.visible = !inCk);
+  ckHide = Math.max(ckDip, ckNeedAir > 0.05 ? 0.2 : 0);
+  m.interior.forEach(o => o.visible = !(inCk && ckHide > 0.1));
   camera.position.lerpVectors(camPos, ckPos, e);
   tmpB.lerpVectors(chaseLook, ckLook, e);
   camera.up.lerpVectors(chaseUp, ckUp, e).normalize();
@@ -1312,11 +1836,23 @@ function stepRace(dt) {
   stepCar(ai, ai.finished ? { steer: aiInput(ai, null, 20).steer, gas: false, brake: ai.v > 15, boost: false } : aiInput(ai, player, aiTop), dt);
   collideCars(player, ai, rel => { if (rel > 2) sfxThud(Math.min(1, rel / 12)); });
   raceTime += dt; TT += dt;
+  // liikkuvan nostosillan kulma ruudulle lähestyttäessä
+  for (const b of track.bridges) {
+    if (!b.leaf || player.state !== 'drive') continue;
+    const dg = mod(b.s0 - player.s, track.L);
+    if (dg < 260) { const a = bridgeAngle(b, TT) * 57.3, up = bridgeAngle(b, TT + 0.2) > bridgeAngle(b, TT); $('msg').textContent = 'Nostosilta ' + (up ? '▲ nousee ' : '▼ laskee ') + Math.round(a) + '°'; $('msg').className = 'info'; $('msg').style.opacity = 1; msgTimer = 0.3; }
+  }
+  // mäkihypyn vauhtivihje kerran kierroksella
+  for (const w of track.walls) {
+    if (!w.abs || w.H > 0 || player.state !== 'drive') continue;
+    const dg = mod(w.s0 - player.s, track.L);
+    if (dg < 330 && dg > 300 && player.hintLap !== player.lap) { player.hintLap = player.lap; showMsg(track.def.key === 'makihyppy' ? 'Mäkihyppy edessä · sopiva vauhti 85–110 km/h' : 'Jyrkkä pudotus edessä · hidasta alle 120 km/h', 'info'); }
+  }
   checkLaps(player); checkLaps(ai);
   if (gameState === 'race' && (player.finished || player.wrecked)) { gameState = 'over'; endTimer = 2.2; }
 }
 function showResult() {
-  resultShown = true;
+  resultShown = true; setTouchVisible(false); for (const k in touch) touch[k] = k === 'steer' ? 0 : false;
   if (mode === 'champ' && champ) { finishChampRace(); return; }
   const c = player, won = c.finished && finishOrder[0] === c;
   $('resTitle').textContent = c.wrecked ? 'Runko hajosi' : won ? 'Voitto' : 'Toinen sija';
@@ -1340,6 +1876,10 @@ function startRace() {
   $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('pause').classList.add('hidden'); $('hud').classList.remove('hidden');
   $('touch').classList.add('on');
   gameState = 'countdown'; countT = 3.6; $('msg').style.opacity = 0;
+  if (track.weather !== 'clear') {
+    const w = WEATHER[track.weather], tip = { night: 'pimeää – seuraa heijastimia', snow: 'liukasta: pito 55 %, jarrut heikot', rain: 'märkää: pito 68 %, jarrutusmatkat pidempiä', fog: 'näkyvyys alle 100 m' }[track.weather];
+    showMsg(w.icon + ' ' + w.name + ': ' + tip, 'info'); msgTimer = 4;
+  }
 }
 function toMenu() {
   gameState = 'menu'; setupRace(trackIdx); refreshMenu();
@@ -1348,8 +1888,8 @@ function toMenu() {
 }
 let prevState = null;
 function togglePause() {
-  if (gameState === 'paused') { gameState = prevState; $('pause').classList.add('hidden'); last = performance.now(); return; }
-  if (gameState === 'race' || gameState === 'countdown') { prevState = gameState; gameState = 'paused'; $('pause').classList.remove('hidden'); $('resumeBtn').focus(); }
+  if (gameState === 'paused') { gameState = prevState; $('pause').classList.add('hidden'); setTouchVisible(true); last = performance.now(); return; }
+  if (gameState === 'race' || gameState === 'countdown') { prevState = gameState; gameState = 'paused'; $('pause').classList.remove('hidden'); setTouchVisible(false); for (const k in touch) touch[k] = k === 'steer' ? 0 : false; $('resumeBtn').focus(); }
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden && (gameState === 'race' || gameState === 'countdown')) togglePause(); });
 $('resumeBtn').onclick = () => togglePause();
@@ -1377,7 +1917,7 @@ function saveChamp() { try { if (champ) localStorage.setItem(CKEY, JSON.stringif
 function loadTrophies() { try { return JSON.parse(localStorage.getItem(TKEY) || '{}'); } catch (e) { return {}; } }
 function saveTrophies(t) { try { localStorage.setItem(TKEY, JSON.stringify(t)); } catch (e) {} }
 const seriesTracks = set => TRACKS.map((t, i) => ((t.set || 1) === set ? i : -1)).filter(i => i >= 0);
-const SERIES_NAMES = { 1: 'Sarja 1', 2: 'Sarja 2: uudet radat', 3: 'Sarja 3: villit radat' };
+const SERIES_NAMES = { 1: 'Sarja 1', 2: 'Sarja 2: uudet radat', 3: 'Sarja 3: villit radat', 4: 'Sarja 4: Muuttuva sää' };
 function oppSkill(d) { return d.skill + DOFF[champ.diff] + (champ.set - 1) * 0.8; }
 function newChamp(set) {
   const tracks = seriesTracks(set), n = tracks.length, opp = [];
@@ -1465,7 +2005,7 @@ function refreshMenu() {
   const ml = $('modeList'); if (!ml) return;
   ml.querySelectorAll('.btn').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode));
   const saved = loadChamp(), tro = loadTrophies();
-  const cups = [1, 2, 3].map(n => 'Sarja ' + n + ' ' + (tro[n] ? (tro[n] === 1 ? '🏆' : tro[n] === 2 ? '🥈' : tro[n] === 3 ? '🥉' : tro[n] + '.') : '–')).join(' · ');
+  const cups = [1, 2, 3, 4].map(n => 'Sarja ' + n + ' ' + (tro[n] ? (tro[n] === 1 ? '🏆' : tro[n] === 2 ? '🥈' : tro[n] === 3 ? '🥉' : tro[n] + '.') : '–')).join(' · ');
   $('modeInfo').textContent = mode === 'champ'
     ? 'Aja valitun sarjan kaikki radat seitsemää kuljettajaa vastaan, yksi kaksinkamppailu per rata. Voitto 2 p, nopein kierros 1 p. Parhaat sijoitukset: ' + cups
     : 'Yksi kisa valitulla radalla. Parhaat sijoitukset sarjoissa: ' + cups;
@@ -1480,12 +2020,12 @@ function buildMenu() {
   [['Yksittäinen kisa', 'single'], ['Mestaruussarja', 'champ']].forEach(([lb, m]) => { const b = document.createElement('button'); b.className = 'btn'; b.dataset.mode = m; b.textContent = lb; b.onclick = () => { mode = m; refreshMenu(); }; mlist.appendChild(b); });
   const list = $('trackList'), ser = $('seriesList');
   const showSeries = n => { curSeries = n; refreshMenu(); list.querySelectorAll('.tcard').forEach(e => e.classList.toggle('hidden', +e.dataset.set !== n)); ser.querySelectorAll('.btn').forEach((e, j) => e.setAttribute('aria-pressed', j + 1 === n)); };
-  [['Sarja 1', 1], ['Sarja 2: uudet radat', 2], ['Sarja 3: villit radat', 3]].forEach(([lb, n]) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = lb; b.onclick = () => showSeries(n); ser.appendChild(b); });
+  [['Sarja 1', 1], ['Sarja 2: uudet radat', 2], ['Sarja 3: villit radat', 3], ['Sarja 4: Muuttuva sää', 4]].forEach(([lb, n]) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = lb; b.onclick = () => showSeries(n); ser.appendChild(b); });
   TRACKS.forEach((t, i) => {
     const tr = getTrack(i);
     const b = document.createElement('button'); b.className = 'tcard'; b.dataset.set = t.set || 1; b.setAttribute('aria-pressed', i === trackIdx);
     const best = loadBest(i);
-    b.innerHTML = '<div class="nm"><span>' + t.name + '</span><span class="st" aria-label="vaikeus ' + t.stars + '/3">' + '■'.repeat(t.stars) + '□'.repeat(3 - t.stars) + '</span></div>' +
+    b.innerHTML = '<div class="nm"><span>' + (t.weather ? WEATHER[t.weather].icon + ' ' : '') + t.name + '</span><span class="st" aria-label="vaikeus ' + t.stars + '/3">' + '■'.repeat(t.stars) + '□'.repeat(3 - t.stars) + '</span></div>' +
       '<canvas width="240" height="38" aria-hidden="true"></canvas><p>' + t.desc + '</p><div class="meta">' + Math.round(tr.L) + ' m · ' + tr.laps + ' kierrosta · ennätys ' + fmt(best) + '</div>';
     const cv = b.querySelector('canvas'), x = cv.getContext('2d');
     let mn = 1e9, mx = -1e9; const hs = [];
@@ -1532,7 +2072,7 @@ function frame(now) {
   }
   if (gameState !== 'paused') { placeCar(player, pMesh, dt); placeCar(ai, aMesh, dt); }
   updateAudio();
-  sky.position.copy(camera.position);
+  sky.position.copy(camera.position); updateWeatherFx(dt);
   renderer.render(scene, camera);
 }
 
