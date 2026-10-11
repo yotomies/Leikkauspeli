@@ -284,7 +284,7 @@ body.touch #gapTxt{display:none}
 const G = 10, GRIP = 17, LAPS = 3, POPG = 2.8, AIRSTEER = 0.5;
 let HALF = 6;
 let TT = 0; // ratakello (nostosillat)
-const HOOKS = { msg() {}, thud() {}, crack() {}, fall() {}, wreck() {}, lap() {} };
+const HOOKS = { msg() {}, thud() {}, crack() {}, fall() {}, wreck() {}, lap() {}, aiEvent() {} };
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 const lerp = (a, b, t) => a + (b - a) * t;
 const mod = (a, n) => ((a % n) + n) % n;
@@ -588,7 +588,8 @@ function crossProfile(X, H, extra) {
   if (!ok) { const seen = {}; ps.forEach(p => { p.up = seen[p.k] === undefined ? true : !seen[p.k]; seen[p.k] = p.up; }); }
   return { t: 'prof', pts: ps.map(p => [p.s, p.up ? H : 0]).concat(extra || []) };
 }
-function buildTrack(def) {
+function buildTrack(def, wf) {
+  wf = wf || 1; // leveyskerroin (helppo vaikeustaso = leveämmät radat)
   const pts = def.pts.map(p => new THREE.Vector3(p[0], 0, p[1]));
   const curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
   const N = Math.round(curve.getLength());
@@ -608,7 +609,7 @@ function buildTrack(def) {
   for (let i = 0; i < N; i++) { let t = 0; for (let j = -bw; j <= bw; j++) t += BK0[(i + j + N) % N]; BK[i] = t / (2 * bw + 1); }
   // sää: pito, kiihtyvyys ja jarrut (talvi ja sade liukkaampia)
   const WX = { snow: [0.55, 0.8, 0.5], rain: [0.68, 0.92, 0.68] }[def.weather] || [1, 1, 1];
-  const tr = { weather: def.weather || 'clear', gripMul: WX[0], accMul: WX[1], brakeMul: WX[2], def, name: def.name, N, L, ds, X, Z, HD, K, BK, base: def.base, half: def.half || 6, laps: def.laps || LAPS, feats: [], jumps: [], gap: false };
+  const tr = { weather: def.weather || 'clear', gripMul: WX[0], accMul: WX[1], brakeMul: WX[2], def, name: def.name, N, L, ds, X, Z, HD, K, BK, base: def.base, half: (def.half || 6) * wf, wf, laps: def.laps || LAPS, feats: [], jumps: [], gap: false };
   // kaikki risteyskohdat (rata kulkee itsensä yli tai ali): [sig1, sig2] -parit
   const cand = [];
   if (def.cross) for (let i = 0; i < N; i += 2) for (let j = i + 2; j < N; j += 2) {
@@ -786,15 +787,16 @@ function newCar(isAI, s, d) {
 }
 
 function hurt(c, amt) {
-  if (c.isAI || c.wrecked) return;
+  if (c.wrecked) return;
+  if (c.isAI && (!c.takeDamage || !(c.errUntil > c.dist - 40))) return; // vastustaja vaurioituu vain omista virheistään
   c.damage = Math.min(100, c.damage + amt);
-  if (c.damage >= 100) { c.wrecked = true; HOOKS.wreck(c); }
+  if (c.damage >= 100) { c.wrecked = true; if (c.isAI) HOOKS.aiEvent(c, 'wreck'); else HOOKS.wreck(c); }
 }
 
 function onLand(c, imp, edge) {
   c.suspV -= Math.min(imp, 20) * 0.12;
   if (edge) { c.v *= 0.45; hurt(c, 14); if (!c.isAI) { HOOKS.msg('Osuit aukon reunaan!', 'bad'); HOOKS.crack(); } return; }
-  if (c.isAI) return;
+  if (c.isAI) { if (imp > 10) { hurt(c, (imp - 10) * 3); if (imp > 13 && c.errUntil > c.dist - 40) HOOKS.aiEvent(c, 'hard'); } if (c.airT > 0.5) aiMaybeWobble(c); return; }
   if (imp > 10) { const dmg = (imp - 10) * 3; hurt(c, dmg); HOOKS.msg('Kova lasku · vauriot +' + Math.round(dmg) + ' %', 'bad'); HOOKS.crack(); }
   else if (c.airT > 0.9) HOOKS.msg('Siisti hyppy · ' + c.airT.toFixed(1) + ' s ilmassa', 'good');
   HOOKS.thud(Math.min(1, imp / 14));
@@ -832,6 +834,7 @@ function startFall(c, fromGap) {
   const bz = inBridgeZone(track, c.s) || inBridgeZone(track, c.s - 8); if (bz) rs = bz.s1 + 6;
   c.respawnS = mod(rs, track.L);
   if (!c.isAI) { hurt(c, 10); HOOKS.msg('Putosit radalta · nosturi tulee', 'bad'); HOOKS.fall(); }
+  else { hurt(c, 10); HOOKS.aiEvent(c, 'fall'); }
 }
 
 function stepFall(c, dt) {
@@ -983,7 +986,7 @@ function stepCar(c, inp, dt) {
     } else if (!exists && c.y < sh - 0.6) { c.s = mod(sNew, tr.L); startFall(c, gap || Math.abs(c.d) < HALF); return; }
   }
   c.s = mod(sNew, tr.L);
-  if (c.isAI) { const lim = HALF - 1.3; if (Math.abs(c.d) > lim) { c.d = clamp(c.d, -lim, lim); c.psi *= 0.5; } }
+  if (c.isAI && !(c.errUntil > c.dist)) { const lim = HALF - 1.3; if (Math.abs(c.d) > lim) { c.d = clamp(c.d, -lim, lim); c.psi *= 0.5; } } // virheen aikana ei turvarajaa
   // visuaalinen nyökkäys
   // ilmassa auto säilyttää asentonsa (inertia); maassa se asettuu rinteen mukaan
   if (c.grounded) { const pt = Math.atan(slopeAt(tr, c.s) * Math.cos(c.psi)); c.pitch += (pt - c.pitch) * Math.min(1, dt * 14); }
@@ -1016,21 +1019,44 @@ function collideCars(a, b, onHit) {
 
 const DIFFS = [{ name: 'Helppo', top: 40 }, { name: 'Normaali', top: 45.5 }, { name: 'Vaikea', top: 50 }];
 
+// ---- vastustajan ajovirheet ----
+// c.err = { prone: todennäköisyyskerroin, bias: -1 (liian varovainen) ... +1 (liian kova) }
+function aiRoll(c, key, weight, other, until) {
+  if (!c.isAI || !c.err) return 1;
+  c.errKeys = c.errKeys || {}; const lap = Math.floor(c.dist / track.L), k = key + '@' + lap;
+  if (c.errKeys[k] !== undefined) return c.errKeys[k];
+  let f = 1;
+  const behind = other ? other.dist - c.dist : 0;
+  if (c.errLap !== lap && behind < 250 && Math.random() < c.err.prone * weight) {
+    const fast = Math.random() < 0.5 + 0.4 * c.err.bias;
+    f = fast ? 1.12 + Math.random() * 0.12 : 0.8 + Math.random() * 0.08;
+    c.errLap = lap; c.errUntil = c.dist + until;
+  }
+  c.errKeys[k] = f; return f;
+}
+function aiMaybeWobble(c) {
+  if (!c.err || c.wobbleT > 0) return;
+  if (Math.random() < c.err.prone * 0.6) { c.wobbleT = 1.3; c.errUntil = c.dist + 60; }
+}
 function aiInput(c, other, top) {
   const tr = track, L = tr.L, inp = { steer: 0, gas: false, brake: false, boost: false };
   if (c.state !== 'drive') return inp;
-  let vt = top;
-  for (let k = 0; k <= 100; k += 10) { const kk = Math.abs(samp(tr, c.s + k).k); if (kk > 1e-4) vt = Math.min(vt, Math.sqrt((GRIP * tr.gripMul + 10 * Math.abs(bankAt(tr, c.s + k))) * 0.88 / kk)); }
+  let vt = top, vCurve = top;
+  for (let k = 0; k <= 100; k += 10) { const kk = Math.abs(samp(tr, c.s + k).k); if (kk > 1e-4) vCurve = Math.min(vCurve, Math.sqrt((GRIP * tr.gripMul + 10 * Math.abs(bankAt(tr, c.s + k))) * 0.88 / kk)); }
+  // myöhäinen jarrutus: joskus vastustaja ei hidasta ajoissa kaarteeseen
+  if (vCurve < c.v - 5 && aiRoll(c, 'c' + Math.floor(c.s / 120), 0.35, other, 140) !== 1) vCurve = top;
+  vt = Math.min(vt, vCurve);
   let nearJump = false;
-  for (const j of tr.jumps) {
-    const dg = mod(j.gs - c.s, L); if (dg < 170) { vt = Math.max(vt, j.minV); nearJump = true; }
-    if (j.minV > 50 && dg < 420) { vt = Math.max(vt, j.minV); nearJump = true; if (dg < 300) { inp.boost = true; if (c.isAI) c.boost = Math.max(c.boost, 40); } }
-  }
+  tr.jumps.forEach((j, ji) => {
+    const dg = mod(j.gs - c.s, L);
+    if (dg < 170) { const f = aiRoll(c, 'j' + ji, 1, other, dg + 160); vt = f < 1 ? Math.min(vt, j.minV * f) : Math.max(vt, j.minV * f); nearJump = true; }
+    if (j.minV > 50 && dg < 420) { vt = Math.max(vt, j.minV); nearJump = true; if (dg < 300 && aiRoll(c, 'jb' + ji, 0.8, other, dg + 200) === 1) { inp.boost = true; if (c.isAI) c.boost = Math.max(c.boost, 40); } }
+  });
   for (const l of tr.segs) {
     const dg = mod(l.s0 - c.s, L);
-    if (l.kind === 'wall' && l.abs && l.H < 0) { if (dg < 260) { vt = Math.min(vt, l.aiV); nearJump = true; } continue; }
+    if (l.kind === 'wall' && l.abs && l.H < 0) { if (dg < 260) { vt = Math.min(vt, l.aiV * aiRoll(c, 'd' + l.s0, 1, other, dg + 120)); nearJump = true; } continue; }
     if (l.kind === 'wall' && l.abs && c.isAI && dg < 300) c.boost = Math.max(c.boost, 40);
-    if (l.kind === 'wall') { if (dg < 600 || dg > L - l.Ls - 5) { vt = 80; nearJump = true; if (dg < 140 || dg > L - l.Ls - 5) inp.boost = true; } continue; }
+    if (l.kind === 'wall') { if (dg < 600 || dg > L - l.Ls - 5) { vt = 80; nearJump = true; if ((dg < 140 || dg > L - l.Ls - 5) && aiRoll(c, 'w' + l.s0, 0.7, other, dg + 150) === 1) inp.boost = true; } continue; }
     if (dg < 190 || dg > L - l.Ls - 5) { vt = Math.max(vt, l.minV + 3); nearJump = true; }
   }
   const cw = c.inWall ? sigOf(tr, c.s).wall : null;
@@ -1041,7 +1067,7 @@ function aiInput(c, other, top) {
     const dg = mod(b.s0 - c.s, L); if (dg > 220) continue;
     if (b.leaf) { // liikkuva nostosilta: vauhti sen mukaan, missä kulmassa silta on perillä
       const deg = bridgeAngle(b, TT + dg / Math.max(c.v, 12)) * 57.3;
-      vt = clamp(44 - 1.6 * (deg - 4), 26, 46); nearJump = true; continue;
+      vt = clamp(44 - 1.6 * (deg - 4), 26, 46) * aiRoll(c, 'b' + b.s0, 1, other, dg + 200); nearJump = true; continue;
     }
     nearJump = true; const ve = Math.max(c.v, 14);
     const bad = bridgeAngle(b, TT + dg / ve) > 0.03 || bridgeAngle(b, TT + (dg + b.Lb + 6) / ve) > 0.03;
@@ -1057,6 +1083,7 @@ function aiInput(c, other, top) {
   const av = Math.max(Math.abs(c.v), 0.1), sf = Math.min(1, av / 5);
   const want = -sm.k * c.v * Math.cos(c.psi) + 4 * (psiDes - c.psi);
   inp.steer = clamp(want / (1.8 * sf), -1, 1);
+  if (c.wobbleT > 0) { c.wobbleT -= 1 / 120; inp.steer = clamp(inp.steer + Math.sin(c.wobbleT * 11) * 0.7, -1, 1); } // horjuminen
   return inp;
 }
 // ===================== PELI: grafiikka, ohjaus, ääni, kisan kulku =====================
@@ -1553,15 +1580,18 @@ function placeCar(c, m, dt) {
 // ---------- Tila ----------
 let player = null, ai = null, trackIdx = 0, diffIdx = 1, gameState = 'menu', raceTime = 0, countT = 0, camMode = 'cockpit'; // peli alkaa aina ohjaamonäkymästä
 let resultShown = false, endTimer = 0, finishOrder = [];
-const builtTracks = TRACKS.map(() => null);
-const getTrack = i => builtTracks[i] || (builtTracks[i] = buildTrack(TRACKS[i]));
+// helpolla vaikeustasolla radat ovat 40 % leveämpiä
+const WIDTH = [1.4, 1, 1];
+const builtTracks = {};
+const getTrack = (i, wf) => { wf = wf || 1; const k = i + ':' + wf; return builtTracks[k] || (builtTracks[k] = buildTrack(TRACKS[i], wf)); };
+const curWidth = () => WIDTH[mode === 'champ' && champ ? champ.diff : diffIdx];
 const bestKey = i => 'taivasrata-paras-' + (TRACKS[i].key || i);
 function loadBest(i) { try { const v = localStorage.getItem(bestKey(i)); return v ? parseFloat(v) : null; } catch (e) { return null; } }
 function saveBest(i, t) { try { localStorage.setItem(bestKey(i), String(t)); } catch (e) {} }
 const fmt = t => { if (t == null || !isFinite(t)) return '–'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
 
 function setupRace(idx) {
-  trackIdx = idx; useTrack(getTrack(idx)); applyWeather(track.weather);
+  trackIdx = idx; useTrack(getTrack(idx, curWidth())); applyWeather(track.weather);
   buildTrackMeshes(track, idx + 1);
   player = newCar(false, track.L - 10, -3); ai = newCar(true, track.L - 10, 3); ai.lane = 2.5;
   raceTime = 0; finishOrder = []; resultShown = false; endTimer = 0;
@@ -1577,6 +1607,10 @@ HOOKS.thud = s => { sfxThud(s); if (s > 0.35) buzz(Math.round(20 + s * 40)); };
 HOOKS.crack = () => { sfxCrack(); buzz([40, 30, 60]); };
 HOOKS.fall = () => { sfxCrack(); buzz(120); };
 HOOKS.wreck = () => { showMsg('Runko hajosi', 'bad'); sfxCrack(); };
+HOOKS.aiEvent = (c, kind) => {
+  const nm = curOpp ? curOpp.name : 'Vastustaja';
+  showMsg(kind === 'fall' ? nm + ' putosi radalta' : kind === 'wreck' ? nm + ' romutti autonsa' : nm + ' laskeutui rajusti', 'good');
+};
 
 let actx = null, eng = null, muted = false, master = null;
 function initAudio() {
@@ -1954,7 +1988,7 @@ function checkLaps(c) {
 function stepRace(dt) {
   const pi = playerInput();
   stepCar(player, pi, dt);
-  stepCar(ai, ai.finished ? { steer: aiInput(ai, null, 20).steer, gas: false, brake: ai.v > 15, boost: false } : aiInput(ai, player, aiTop), dt);
+  stepCar(ai, ai.wrecked ? { steer: 0, gas: false, brake: true, boost: false } : ai.finished ? { steer: aiInput(ai, null, 20).steer, gas: false, brake: ai.v > 15, boost: false } : aiInput(ai, player, aiTop), dt);
   collideCars(player, ai, rel => { if (rel > 2) { sfxThud(Math.min(1, rel / 12)); rumble(Math.min(1, rel / 10), 120); } });
   raceTime += dt; TT += dt;
   // liikkuvan nostosillan kulma ruudulle lähestyttäessä
@@ -1994,6 +2028,10 @@ function startRace() {
   } else { curOpp = null; aiTop = DIFFS[diffIdx].top; aMesh.mBody.color.setHex(0x1f5fd6); aMesh.mAcc.color.setHex(0xe9eef7); }
   $('champ').classList.add('hidden'); $('restartBtn').hidden = mode === 'champ';
   setupRace(trackIdx);
+  // vastustajan ajovirheet: kuljettajan luonne ja vaikeustaso
+  const errMul = [1.6, 1, 0.6][mode === 'champ' && champ ? champ.diff : diffIdx];
+  ai.err = curOpp ? { prone: curOpp.prone * errMul, bias: curOpp.bias } : { prone: [0.14, 0.08, 0.04][diffIdx], bias: Math.random() * 0.6 - 0.3 };
+  ai.takeDamage = true;
   $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('pause').classList.add('hidden'); $('hud').classList.remove('hidden');
   if (!pad.active) $('touch').classList.add('on');
   gameState = 'countdown'; countT = 3.6; $('msg').style.opacity = 0;
@@ -2022,13 +2060,13 @@ $('startBtn').onclick = () => { if (mode === 'champ') { newChamp(curSeries); sho
 // ---------- Valikko ----------
 // ---------- Mestaruussarja ----------
 const DRIVERS = [
-  { name: 'Raili Rautakoura', skill: 48, color: 0x1f5fd6, acc: 0xe9eef7, tag: 'Hallitseva mestari, ei koskaan nosta kaasujalkaa.' },
-  { name: 'Turbo-Tapsa', skill: 47, color: 0x1c9c4a, acc: 0xffffff, tag: 'Polttaa turbon jo lähtösuoralla.' },
-  { name: 'Hurja Hanna', skill: 46, color: 0x8a2bd6, acc: 0xffcc00, tag: 'Hyppää ensin, miettii myöhemmin.' },
-  { name: 'Kaasu-Kalle', skill: 45, color: 0xe6e6e6, acc: 0x222222, tag: 'Tasainen ja sitkeä, harvoin putoaa.' },
-  { name: 'Ruuvi-Raimo', skill: 44, color: 0x8a5a2c, acc: 0xff8800, tag: 'Korjaamon kuningas, radalla vähän hitaampi.' },
-  { name: 'Nopsa Nelli', skill: 43, color: 0xff5fa8, acc: 0xffffff, tag: 'Lupaava tulokas, kiihdyttää kovaa.' },
-  { name: 'Pelti-Pena', skill: 41.5, color: 0x2a3346, acc: 0x4fd8ff, tag: 'Auto on enemmän teippiä kuin peltiä.' },
+  { name: 'Raili Rautakoura', prone: 0.03, bias: 0.1, skill: 48, color: 0x1f5fd6, acc: 0xe9eef7, tag: 'Hallitseva mestari, ei koskaan nosta kaasujalkaa.' },
+  { name: 'Turbo-Tapsa', prone: 0.06, bias: 0.6, skill: 47, color: 0x1c9c4a, acc: 0xffffff, tag: 'Polttaa turbon jo lähtösuoralla.' },
+  { name: 'Hurja Hanna', prone: 0.11, bias: 0.85, skill: 46, color: 0x8a2bd6, acc: 0xffcc00, tag: 'Hyppää ensin, miettii myöhemmin.' },
+  { name: 'Kaasu-Kalle', prone: 0.05, bias: -0.2, skill: 45, color: 0xe6e6e6, acc: 0x222222, tag: 'Tasainen ja sitkeä, harvoin putoaa.' },
+  { name: 'Ruuvi-Raimo', prone: 0.08, bias: -0.7, skill: 44, color: 0x8a5a2c, acc: 0xff8800, tag: 'Korjaamon kuningas, radalla vähän hitaampi.' },
+  { name: 'Nopsa Nelli', prone: 0.10, bias: 0.4, skill: 43, color: 0xff5fa8, acc: 0xffffff, tag: 'Lupaava tulokas, kiihdyttää kovaa.' },
+  { name: 'Pelti-Pena', prone: 0.15, bias: 0, skill: 41.5, color: 0x2a3346, acc: 0x4fd8ff, tag: 'Auto on enemmän teippiä kuin peltiä.' },
 ];
 const DOFF = [-5, 0, 3], ME = 'Sinä';
 let mode = 'single', champ = null, aiTop = 45.5, curOpp = null, curSeries = 1;
@@ -2161,8 +2199,8 @@ function buildMenu() {
   showSeries(1); refreshMenu();
   const dl = $('diffList');
   DIFFS.forEach((d, i) => {
-    const b = document.createElement('button'); b.className = 'btn'; b.textContent = d.name; b.setAttribute('aria-pressed', i === diffIdx);
-    b.onclick = () => { diffIdx = i; dl.querySelectorAll('.btn').forEach((e, j) => e.setAttribute('aria-pressed', j === i)); };
+    const b = document.createElement('button'); b.className = 'btn'; b.textContent = d.name + (WIDTH[i] > 1 ? ' · leveät radat' : ''); b.setAttribute('aria-pressed', i === diffIdx);
+    b.onclick = () => { diffIdx = i; dl.querySelectorAll('.btn').forEach((e, j) => e.setAttribute('aria-pressed', j === i)); if (gameState === 'menu') setupRace(trackIdx); };
     dl.appendChild(b);
   });
 }
