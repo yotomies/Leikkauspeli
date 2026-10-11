@@ -184,6 +184,13 @@ body.touch #gapTxt{display:none}
 @media (prefers-reduced-motion: reduce){ #rotateGate .ph{animation:none;transform:rotate(-90deg)} }
 #rotateGate h2{font-size:18px;margin:14px 0 8px}
 #rotateGate p{color:var(--muted);margin:0 0 18px;max-width:30ch}
+
+/* Mobiili: kapeampi runkovauriomittari */
+body.touch #tc{padding:3px 8px}
+body.touch #tc .lbl{font-size:10px}
+body.touch #crack{width:min(140px,24vw);height:12px;margin-top:2px}
+body.touch .cage canvas{height:12px}
+body.touch #hud.cockpit #tl,body.touch #hud.cockpit #tr{top:calc(24px + env(safe-area-inset-top,0px))}
 </style>
 </head>
 <body>
@@ -860,6 +867,7 @@ function stepCrane(c, dt) {
 }
 
 function stepCar(c, inp, dt) {
+  c.lastDt = dt;
   if (c.state === 'fall') return stepFall(c, dt);
   if (c.state === 'crane') return stepCrane(c, dt);
   const tr = track;
@@ -1083,7 +1091,7 @@ function aiInput(c, other, top) {
   const av = Math.max(Math.abs(c.v), 0.1), sf = Math.min(1, av / 5);
   const want = -sm.k * c.v * Math.cos(c.psi) + 4 * (psiDes - c.psi);
   inp.steer = clamp(want / (1.8 * sf), -1, 1);
-  if (c.wobbleT > 0) { c.wobbleT -= 1 / 120; inp.steer = clamp(inp.steer + Math.sin(c.wobbleT * 11) * 0.7, -1, 1); } // horjuminen
+  if (c.wobbleT > 0) { c.wobbleT -= 1 / 120 * (c.lastDt ? c.lastDt * 120 : 1); inp.steer = clamp(inp.steer + Math.sin(c.wobbleT * 11) * 0.7, -1, 1); } // horjuminen
   return inp;
 }
 // ===================== PELI: grafiikka, ohjaus, ääni, kisan kulku =====================
@@ -1958,10 +1966,10 @@ function updateHUD(dt) {
   const gapM = Math.abs(c.dist - ai.dist);
   $('gapTxt').textContent = gapM < 5 ? 'Rinnakkain' : (ahead ? 'Johdat ' : 'Takana ') + Math.round(gapM) + ' m';
   drawCrack(c.damage); drawMap();
-  // mobiilissa ääni- ja taukonapit nopeusnäytön viereen
+  // mobiilissa ääni- ja taukonapit minikartan vasemmalle puolelle, yläreunat samalla tasolla
   const hb = $('hudBtns');
-  if (touchMode) { const r = $('bl').getBoundingClientRect(); hb.style.left = (r.right + 8) + 'px'; hb.style.top = r.top + 'px'; }
-  else if (hb.style.left) { hb.style.left = ''; hb.style.top = ''; }
+  if (touchMode) { const r = $('tr').getBoundingClientRect(); hb.style.left = 'auto'; hb.style.right = (window.innerWidth - r.left + 6) + 'px'; hb.style.top = r.top + 'px'; }
+  else if (hb.style.top) { hb.style.left = ''; hb.style.right = ''; hb.style.top = ''; }
   if (camBlend > 0.01) {
     $('dSpd').textContent = Math.round(Math.abs(c.v) * 3.6);
     $('dBoost').style.width = c.boost + '%';
@@ -2035,6 +2043,7 @@ function startRace() {
   $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('pause').classList.add('hidden'); $('hud').classList.remove('hidden');
   if (!pad.active) $('touch').classList.add('on');
   gameState = 'countdown'; countT = 3.6; $('msg').style.opacity = 0;
+  try { renderer.compile(scene, camera); } catch (e) {} // varjostimet valmiiksi, ettei ensimmäisillä metreillä tule nykäyksiä
   if (track.weather !== 'clear') {
     const w = WEATHER[track.weather], tip = { night: 'pimeää – seuraa heijastimia', snow: 'liukasta: pito 55 %, jarrut heikot', rain: 'märkää: pito 68 %, jarrutusmatkat pidempiä', fog: 'näkyvyys alle 100 m' }[track.weather];
     showMsg(w.icon + ' ' + w.name + ': ' + tip, 'info'); msgTimer = 4;
@@ -2224,7 +2233,10 @@ function frame(now) {
     } else {
       if (countT > -0.6) { countT -= dt; if (countT <= -0.4) $('count').textContent = ''; }
       acc += dt;
-      while (acc >= DT) { stepRace(DT); acc -= DT; }
+      // fysiikka etenee joka ruudulla täsmälleen ruudun ajan (tasaisin pikkuaskelin): ei nykimistä, vaikka näytön taajuus vaihtelisi (60/90/120 Hz)
+      const nSteps = Math.max(1, Math.ceil(dt / DT - 1e-6)), hStep = dt / nSteps;
+      for (let i = 0; i < nSteps; i++) stepRace(hStep);
+      acc = 0;
       if (gameState === 'over' && !resultShown) { endTimer -= dt; if (endTimer <= 0) showResult(); }
     }
     updateCamera(dt);
