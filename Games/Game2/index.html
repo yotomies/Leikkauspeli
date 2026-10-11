@@ -116,6 +116,7 @@ kbd{font-family:inherit}
         <dt>Välilyönti / X</dt><dd>Hyppää</dd>
         <dt>Z / E / Enter</dt><dd>Ota tai laske esine. Miekkaillessa pisto.</dd>
         <dt>P / M</dt><dd>Tauko / äänet</dd>
+        <dt>Peliohjain</dt><dd>Ristiohjain tai vasen sauva liikuttaa, A hyppää, B, X ja Y toimivat kuten Z, Start pysäyttää.</dd>
       </dl>
     </div>
     <div>
@@ -135,7 +136,15 @@ const W=320,PLAY=176,PW=10;
 const cv=document.getElementById('game'),ctx=cv.getContext('2d');
 const TOUCH=!matchMedia('(hover:hover) and (pointer:fine)').matches;
 if(TOUCH){const h=document.documentElement;h.classList.add('touch');if(document.fullscreenEnabled||document.webkitFullscreenEnabled)h.classList.add('can-fs');}
-function vib(p){if(TOUCH&&navigator.vibrate){try{navigator.vibrate(p);}catch(e){}}}
+function vib(p){if(TOUCH&&navigator.vibrate){try{navigator.vibrate(p);}catch(e){}}padRumble(p);}
+function padRumble(p){
+ if(!navigator.getGamepads)return;
+ const ms=Array.isArray(p)?p.reduce((a,b)=>a+b,0):p;
+ for(const gp of navigator.getGamepads()){
+  const a=gp&&gp.vibrationActuator;
+  if(a&&a.playEffect){try{const r=a.playEffect('dual-rumble',{duration:Math.min(ms*2,300),strongMagnitude:.6,weakMagnitude:.4});if(r&&r.catch)r.catch(()=>{});}catch(e){}}
+ }
+}
 ctx.imageSmoothingEnabled=false;
 
 /* ---------------- world ---------------- */
@@ -299,6 +308,29 @@ function syncUI(){
  stanceBtns.forEach((b,i)=>b.classList.toggle('sel',i===st));
 }
 cv.addEventListener('pointerdown',()=>{audioInit();cv.focus(); if(G.mode!=='play'){pressed.act=true;} else if(G.paused){G.paused=false;}});
+
+/* ---------------- gamepad ---------------- */
+// Peliohjain: vakiokartoitus (Xbox, PlayStation, Switch Pro ym.). Ei vaikuta mihinkään, jos ohjainta ei ole kytketty.
+const gpPrev={};
+function pollGamepad(){
+ if(!navigator.getGamepads)return;
+ let gp=null;for(const p of navigator.getGamepads()){if(p&&p.connected){gp=p;break;}}
+ const now={left:false,right:false,up:false,down:false,jump:false,act:false,start:false};
+ if(gp){
+  const b=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed),ax=gp.axes[0]||0,ay=gp.axes[1]||0;
+  now.left=b(14)||ax<-.4;now.right=b(15)||ax>.4;
+  now.up=b(12)||(ay<-.6&&Math.abs(ay)>Math.abs(ax));now.down=b(13)||(ay>.6&&Math.abs(ay)>Math.abs(ax));
+  now.jump=b(0);now.act=b(1)||b(2)||b(3);now.start=b(9);
+ }
+ for(const k in now){
+  if(now[k]===!!gpPrev[k])continue;
+  gpPrev[k]=now[k];
+  if(k==='start'){if(now[k]){audioInit();if(G.mode==='play')G.paused=!G.paused;else pressed.act=true;}continue;}
+  if(now[k]){audioInit();down(k);}else up(k);
+ }
+}
+window.addEventListener('gamepadconnected',()=>{if(G.mode==='play')say('Peliohjain yhdistetty.');});
+window.addEventListener('gamepaddisconnected',()=>{for(const k in gpPrev){if(gpPrev[k]&&k!=='start')up(k);gpPrev[k]=false;}if(G.mode==='play')G.paused=true;});
 
 /* ---------------- helpers ---------------- */
 function rect(g,c,x,y,w,h){g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),w,h);}
@@ -750,6 +782,7 @@ function drawTitle(){
 
 /* ---------------- loop ---------------- */
 function step(){
+ pollGamepad();
  if(G.mode==='play'){
   if(TOUCH&&G.paused&&pressed.act){G.paused=false;}
   else if(!G.paused)update();

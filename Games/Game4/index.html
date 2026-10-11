@@ -46,6 +46,13 @@ button{font-family:"Press Start 2P",monospace;font-size:10px;color:#000;backgrou
 button:hover{background:var(--orange)}
 button:active{box-shadow:inset 2px 2px 0 #8a8a8a}
 button:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+button.padfocus{outline:3px solid var(--orange);outline-offset:2px;background:var(--orange)}
+#toast{position:absolute;left:50%;top:14%;transform:translateX(-50%);background:rgba(0,26,68,.92);color:#fff;border:2px solid #fff;padding:8px 12px;font:9px "Press Start 2P",monospace;z-index:6;pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap}
+#toast.on{opacity:1}
+.padonly{display:none}
+html.padmode .padonly{display:block}
+html.padmode .touchonly{display:none!important}
+html.padmode.touchmode button[data-act="new2"]{display:inline-block!important}
 button:disabled{background:#6f8fb8;color:#2b4166;cursor:not-allowed;box-shadow:none}
 .btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:12px 0}
 .keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;font-size:12px;line-height:1.8;margin-top:8px}
@@ -113,6 +120,7 @@ html.touchmode .copper{height:26px;margin:-10px -12px 8px}
 <div id="stage">
   <canvas id="game" width="640" height="400" aria-label="Pelialue"></canvas>
   <div id="ov" class="ov hidden"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
   <div id="touch" aria-hidden="true">
     <div id="stickZone"></div>
     <div id="stickBase"><div id="stickKnob"></div></div>
@@ -478,7 +486,7 @@ function setTouchMode(on){
  if(G.mode==='race'&&!G.paused&&R&&!R.done){G.touch=on&&G.players===1; setTouch(true)}
 }
 setTouchMode(touchMode);
-addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&!touchMode)setTouchMode(true); else if(e.pointerType==='mouse'&&touchMode)setTouchMode(false)},true);
+addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&typeof padOff==='function')padOff(); if(e.pointerType==='touch'&&!touchMode)setTouchMode(true); else if(e.pointerType==='mouse'&&touchMode)setTouchMode(false)},true);
 addEventListener('touchstart',()=>{if(!touchMode)setTouchMode(true)},{capture:true,passive:true});
 function touchInput(c){
  const fwd=c.vx*Math.cos(c.a)+c.vy*Math.sin(c.a);
@@ -487,10 +495,18 @@ function touchInput(c){
  if(TS.brake){up=false; down=true}
  return {up,down,steer,front:TS.front,rear:TS.rear,mine:TS.mine};
 }
-function humInput(c){
- if(G.touch&&c.hum===G.humans[0])return touchInput(c);
+function keyInput(c){
  const m=c.hum.map,k=a=>a.some(x=>keys[x]);
  return {up:k(m.up),down:k(m.down),steer:(k(m.right)?1:0)-(k(m.left)?1:0),front:k(m.front),rear:k(m.rear),mine:k(m.mine)};
+}
+function humInput(c){
+ const hi=G.humans.indexOf(c.hum),pad=GP.active?padFor(hi):null;
+ if(pad){
+  const p=padInput(pad),k=keyInput(c);
+  return {up:Math.max(p.up,k.up?1:0),down:Math.max(p.down,k.down?1:0),steer:p.steer||k.steer,front:p.front||k.front,rear:p.rear||k.rear,mine:p.mine||k.mine};
+ }
+ if(G.touch&&hi===0)return touchInput(c);
+ return keyInput(c);
 }
 function aiInput(c,T){
  const ai=c.ai,N=T.N,sp=Math.hypot(c.vx,c.vy);
@@ -532,8 +548,9 @@ function fire(c,type){
 }
 function addDamage(c,amt,src){
  if(c.wreckT>0||c.invT>0)return;
+ if(c.human)rumble(c,Math.min(1,amt/45),Math.min(1,amt/30),amt>40?320:160);
  c.damage=Math.min(100,c.damage+amt*(1-0.15*c.armor));
- if(c.damage>=100){c.wreckT=2.5; c.spinT=0; boom(c.x,c.y,2.6); sfx('boom'); if(src&&src!==c)src.kills++}
+ if(c.damage>=100){if(c.human)rumble(c,1,1,600); c.wreckT=2.5; c.spinT=0; boom(c.x,c.y,2.6); sfx('boom'); if(src&&src!==c)src.kills++}
 }
 function respawn(c,T,dmg){
  const p=T.path[c.idx]; c.x=p.x; c.y=p.y; c.a=T.ang[c.idx]; c.vx=c.vy=0; c.damage=dmg==null?45:dmg; c.airT=0; c.sinkT=0; c.boostT=0; c.invT=2; c.spinT=0; c.oilT=0;
@@ -556,7 +573,7 @@ function stepCar(c,inp,T){
   c.airT--; c.x+=c.vx; c.y+=c.vy; c.x=clamp(c.x,12,T.w-12); c.y=clamp(c.y,12,T.h-12);
   if(c.airT<=0){
    for(let i=0;i<12;i++){const a=Math.random()*6.283; R.parts.push({x:c.x,y:c.y,vx:Math.cos(a)*1.2,vy:Math.sin(a)*1.2,life:.45,max:.45,col:'#b9b2a2',sz:3})}
-   sfx('bump');
+   sfx('bump'); if(c.human)rumble(c,0.25,0.5,90);
   }
   c.px=c.x; c.py=c.y;
   return;
@@ -570,9 +587,10 @@ function stepCar(c,inp,T){
  let fwd=c.vx*hx+c.vy*hy,lat=-c.vx*hy+c.vy*hx;
  if(c.spinT>0){c.spinT-=DT; c.a+=0.2*c.spinDir; fwd*=0.97}
  else{
-  if(inp.up){if(fwd<maxSp)fwd=Math.min(maxSp,fwd+acc)}
-  else if(!inp.down)fwd*=0.987;
-  if(inp.down){if(fwd>0.15)fwd-=0.12; else fwd=Math.max(-1.3,fwd-0.045)}
+  const thr=typeof inp.up==='number'?inp.up:(inp.up?1:0),brk=typeof inp.down==='number'?inp.down:(inp.down?1:0);
+  if(thr>0.05){const tgt=maxSp*Math.min(1,thr*1.1); if(fwd<tgt)fwd=Math.min(tgt,fwd+acc*(0.5+0.5*Math.min(1,thr))); else if(brk<=0.05)fwd*=0.995}
+  else if(brk<=0.05)fwd*=0.987;
+  if(brk>0.05){if(fwd>0.15)fwd-=0.12*Math.min(1,brk); else if(brk>0.5)fwd=Math.max(-1.3,fwd-0.045)}
   if(c.boostT>0&&fwd<maxSp)fwd=Math.min(maxSp,fwd+0.08);
   if(fwd>maxSp)fwd-=(fwd-maxSp)*0.06;
   c.a+=inp.steer*0.054*clamp(fwd/1.6,-1,1);
@@ -988,15 +1006,16 @@ function goFull(){
   if(r&&r.then)r.then(lock).catch(()=>{}); else lock();}catch(_){}
 }
 function setTouch(on){
- touchEl.classList.toggle('on',!!(on&&touchMode&&G.players===1));
+ touchEl.classList.toggle('on',!!(on&&touchMode&&G.players===1&&!GP.active));
 }
 function showOv(html){
  const old=ov.querySelector('.panel'),sc=old?old.scrollTop:0;
  ov.innerHTML=html; ov.classList.remove('hidden'); setTouch(false);
  const p=ov.querySelector('.panel'); if(p)p.scrollTop=sc;
+ if(GP.active)padRefocus();
 }
 function hideOv(){
- ov.classList.add('hidden');
+ ov.classList.add('hidden'); GP.focus=null;
  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
  setTouch(G.mode==='race'&&G.players===1);
 }
@@ -1012,7 +1031,8 @@ function showMenu(){
   <div><b>Pelaaja 2</b>nuolinäppäimet ajo<br><kbd>,</kbd> etuohjus, <kbd>.</kbd> takaohjus<br><kbd>-</kbd> miina</div>
  </div>
  <p class="touchonly sub" style="font-size:13px">Kaasu on päällä automaattisesti. Ohjaa liu'uttamalla peukaloa vasemmalle tai oikealle ruudun vasemmalla puolella. JARRU hidastaa, ja kun pidät sitä pohjassa auton pysähdyttyä, auto peruuttaa. Oikealla ovat aseet ja jarru, ylhäällä tauko.</p>
- <p class="tiny">Kausi on ${SEASON} kisaa. Pisteet 10, 7, 5, 4, 3, 2 ja 1. Voita mestaruus, niin nouset kovempaan divisioonaan.<span class="kbonly"> <kbd>P</kbd> tauko, <kbd>M</kbd> ääni.</span></p>
+ <p class="padonly sub" style="font-size:13px"><b class="px" style="font-size:9px;color:var(--orange)">Peliohjain</b><br>Vasen tatti tai ristiohjain ohjaa, RT kaasu ja LT jarru (portaattomat). A etuohjus, B takaohjus, X tai olkanappi miina, Start tauko. Valikoissa ristiohjain liikkuu, A valitsee ja B palaa.</p>
+ <p class="tiny">Kausi on ${SEASON} kisaa. Pisteet 10, 7, 5, 4, 3, 2 ja 1. Voita mestaruus, niin nouset kovempaan divisioonaan.<span class="kbonly"> <kbd>P</kbd> tauko, <kbd>M</kbd> ääni.</span> Peliohjain toimii myös: paina mitä tahansa sen nappia.</p>
  </div>`);
 }
 function standingsTable(){
@@ -1137,18 +1157,117 @@ addEventListener('resize',checkPortrait);
 addEventListener('orientationchange',checkPortrait);
 muteBtn.addEventListener('click',()=>{initAudio(); toggleMute()});
 
+/* ---------- gamepad ---------- */
+const GP={active:false,prev:{},prevDir:{},focus:null,focusKey:null,toastT:0};
+const toastEl=document.getElementById('toast');
+function toast(msg){toastEl.textContent=msg; toastEl.classList.add('on'); clearTimeout(GP.toastT); GP.toastT=setTimeout(()=>toastEl.classList.remove('on'),2200)}
+function padList(){try{return Array.from(navigator.getGamepads?navigator.getGamepads():[]).filter(p=>p&&p.connected)}catch(_){return []}}
+function padFor(hi){return padList()[hi]||null}
+function padBtn(p,i){const x=p.buttons[i]; if(!x)return 0; return x.value>0?x.value:(x.pressed?1:0)}
+function padInput(p){
+ const ax=p.axes[0]||0,DZ=0.15;
+ let steer=Math.abs(ax)>DZ?Math.sign(ax)*Math.min(1,(Math.abs(ax)-DZ)/(1-DZ)):0;
+ if(padBtn(p,14)>.5)steer=-1; if(padBtn(p,15)>.5)steer=1;
+ const rt=padBtn(p,7),lt=padBtn(p,6);
+ return {up:rt>0.05?rt:0,down:lt>0.05?lt:0,steer,front:padBtn(p,0)>.5,rear:padBtn(p,1)>.5,mine:padBtn(p,2)>.5||padBtn(p,4)>.5||padBtn(p,5)>.5};
+}
+function rumble(c,strong,weak,ms){
+ if(!GP.active||!c.hum)return; const p=padFor(G.humans.indexOf(c.hum)); const va=p&&p.vibrationActuator;
+ if(!va||!va.playEffect)return;
+ try{va.playEffect('dual-rumble',{duration:ms,strongMagnitude:clamp(strong,0,1),weakMagnitude:clamp(weak,0,1)}).catch(()=>{})}catch(_){}
+}
+function padOn(){
+ if(GP.active)return; GP.active=true; document.documentElement.classList.add('padmode'); setTouch(false);
+ if(AU.ctx&&AU.ctx.state==='suspended')AU.ctx.resume();
+ if(!ov.classList.contains('hidden'))padRefocus();
+}
+function padOff(){
+ if(!GP.active)return; GP.active=false; document.documentElement.classList.remove('padmode'); padSetFocus(null);
+ setTouch(G.mode==='race'&&ov.classList.contains('hidden'));
+}
+const padButtons=()=>[...ov.querySelectorAll('button')].filter(b=>!b.disabled&&b.offsetParent!==null);
+const btnKey=b=>b?[b.dataset.act||'',b.dataset.id||'',b.dataset.h||'',b.dataset.t||'',b.textContent].join('|'):null;
+function padSetFocus(b){
+ if(GP.focus)GP.focus.classList.remove('padfocus');
+ GP.focus=b; GP.focusKey=btnKey(b);
+ if(b){b.classList.add('padfocus'); try{b.focus({preventScroll:true})}catch(_){} b.scrollIntoView({block:'nearest',inline:'nearest'})}
+}
+function padRefocus(){
+ const list=padButtons(); if(!list.length){GP.focus=null; return}
+ let b=null;
+ if(GP.focusKey){const [a,id,h,t]=GP.focusKey.split('|'); b=list.find(x=>(x.dataset.act||'')===a&&(x.dataset.id||'')===id&&(x.dataset.h||'')===h&&(x.dataset.t||'')===t)}
+ padSetFocus(b||list.find(x=>x.dataset.act!=='buy')||list[0]);
+}
+function padMove(dx,dy){
+ const list=padButtons(); if(!list.length)return;
+ const cur=GP.focus&&list.includes(GP.focus)?GP.focus:null;
+ if(!cur){padRefocus(); return}
+ const r0=cur.getBoundingClientRect(),cx=r0.left+r0.width/2,cy=r0.top+r0.height/2;
+ let best=null,bs=1e9;
+ for(const b of list){
+  if(b===cur)continue; const r=b.getBoundingClientRect(),x=r.left+r.width/2-cx,y=r.top+r.height/2-cy;
+  const along=x*dx+y*dy, side=Math.abs(x*dy)+Math.abs(y*dx);
+  if(along<=4)continue; const sc=along+side*2; if(sc<bs){bs=sc;best=b}
+ }
+ if(best)padSetFocus(best);
+}
+function padActivate(){
+ if(!GP.focus||!document.body.contains(GP.focus)){padRefocus(); return}
+ const b=GP.focus; GP.focusKey=btnKey(b); initAudio(); b.click();
+ setTimeout(()=>{if(!ov.classList.contains('hidden'))padRefocus()},0);
+}
+function padBack(){
+ if(G.mode==='race'&&G.paused){G.paused=false; hideOv(); return}
+ if(G.mode==='menu'&&ov.querySelector('[data-act="quick"]'))showMenu();
+}
+function padPause(){
+ if(G.mode!=='race'||!R||R.done)return;
+ if(!G.paused){G.paused=true; resetTouch(); showPause()} else {G.paused=false; hideOv()}
+}
+function pollPads(){
+ const ps=padList(); if(!ps.length)return;
+ const ovOpen=!ov.classList.contains('hidden');
+ for(const p of ps){
+  const now=p.buttons.map(b=>!!(b&&(b.pressed||b.value>0.5)));
+  const prev=GP.prev[p.index]||[], pd=GP.prevDir[p.index]||{};
+  const ax=p.axes[0]||0, ay=p.axes[1]||0;
+  const dir={l:ax<-0.6,r:ax>0.6,u:ay<-0.6,d:ay>0.6};
+  const hit=i=>now[i]&&!prev[i];
+  if(!GP.active&&(now.some(x=>x)||Math.abs(ax)>0.5||Math.abs(ay)>0.5))padOn();
+  if(GP.active){
+   if(ovOpen){
+    if(hit(12)||(dir.u&&!pd.u))padMove(0,-1);
+    else if(hit(13)||(dir.d&&!pd.d))padMove(0,1);
+    else if(hit(14)||(dir.l&&!pd.l))padMove(-1,0);
+    else if(hit(15)||(dir.r&&!pd.r))padMove(1,0);
+    if(hit(0)||(hit(9)&&!(G.mode==='race'&&G.paused)))padActivate();
+    else if(hit(1))padBack();
+    else if(hit(9))padPause();
+   } else if(hit(9))padPause();
+  }
+  GP.prev[p.index]=now; GP.prevDir[p.index]=dir;
+ }
+}
+addEventListener('gamepadconnected',e=>{toast('Ohjain '+(e.gamepad.index+1)+' yhdistetty')});
+addEventListener('gamepaddisconnected',e=>{
+ toast('Ohjain '+(e.gamepad.index+1)+' irrotettu');
+ delete GP.prev[e.gamepad.index]; delete GP.prevDir[e.gamepad.index];
+ if(G.mode==='race'&&!G.paused&&R&&!R.done){G.paused=true; showPause()}
+ if(!padList().length)padOff();
+});
+
 /* ---------- loop ---------- */
 let acc=0,last=performance.now();
 function frame(now){
  const dt=Math.min(0.1,(now-last)/1000); last=now;
  if(R&&!G.paused&&(R.demo||G.mode==='race')){acc+=dt; let n=0; while(acc>=DT&&n<8){update(); acc-=DT; n++}}
  else acc=0;
- render(); engineSound();
+ pollPads(); render(); engineSound();
  requestAnimationFrame(frame);
 }
 startDemo(); showMenu();
 requestAnimationFrame(frame);
-window.__kp={TS,G,get R(){return R},createRace,update,render,newGame,startRace,TRACKS,keys};
+window.__kp={GP,TS,G,get R(){return R},createRace,update,render,newGame,startRace,TRACKS,keys};
 })();
 </script>
 </body>

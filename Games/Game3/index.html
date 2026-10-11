@@ -49,6 +49,7 @@ body.touchmode main{padding:0;gap:0}
 @media (orientation: portrait){ body.touchmode{align-items:flex-start} }
 .touch{display:none;position:fixed;inset:0;z-index:5;touch-action:none;-webkit-touch-callout:none}
 .touch.on{display:block}
+.touch.on.gp-hidden{display:none}
 .stick{position:fixed;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;
   border:2px solid rgba(255,255,255,.4);background:rgba(64,49,141,.28);pointer-events:none;opacity:.45;
   left:calc(env(safe-area-inset-left,0px) + 96px);top:calc(100% - env(safe-area-inset-bottom,0px) - 96px)}
@@ -85,7 +86,8 @@ body.touchmode main{padding:0;gap:0}
   </div>
   <p class="help" id="help">
     <kbd>←</kbd><kbd>→</kbd> liiku &nbsp; <kbd>↑</kbd> roottori &nbsp; <kbd>↓</kbd> laskeudu tai pudota dynamiitti maassa<br>
-    <kbd>välilyönti</kbd> laser &nbsp; <kbd>X</kbd> dynamiitti &nbsp; <kbd>P</kbd> tauko &nbsp; <kbd>M</kbd> äänet
+    <kbd>välilyönti</kbd> laser &nbsp; <kbd>X</kbd> dynamiitti &nbsp; <kbd>P</kbd> tauko &nbsp; <kbd>M</kbd> äänet<br>
+    Peliohjain: sauva liiku &nbsp; <kbd>A</kbd> lento &nbsp; <kbd>X</kbd>/<kbd>RT</kbd> laser &nbsp; <kbd>B</kbd> dynamiitti &nbsp; <kbd>Start</kbd> tauko
   </p>
 </main>
 
@@ -298,7 +300,7 @@ const KEYMAP={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',Arrow
 addEventListener('keydown',e=>{ const k=KEYMAP[e.code]; if(!k) return; e.preventDefault(); initAudio(); keys[k]=true; });
 addEventListener('keyup',e=>{ const k=KEYMAP[e.code]; if(!k) return; e.preventDefault(); keys[k]=false; });
 addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; if(state==='play') state='paused'; });
-function pressed(k){ return keys[k] && !prev[k]; }
+function pressed(k){ return inp[k] && !prev[k]; }
 let tap=false;
 cv.addEventListener('pointerdown',()=>{ initAudio(); tap=true; cv.focus(); });
 
@@ -383,6 +385,53 @@ addEventListener('blur',releaseAll);
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) releaseAll(); });
 { const D=document; if(!(D.fullscreenEnabled||D.webkitFullscreenEnabled)) document.getElementById('fsBtn').style.display='none'; }
 addEventListener('fullscreenchange',()=>setTimeout(fit,100));
+
+// ---------- gamepad ----------
+const INKEYS=['left','right','up','down','fire','bomb','start','pause','mute'];
+const inp={}, gpk={}, axS={left:false,right:false,up:false,down:false};
+let gpIndex=null, gpUsed=false, gpKind='xbox', gpName='', toastText='', toastT=0;
+function mergeInputs(){ for(const k of INKEYS) inp[k]=!!keys[k]||!!gpk[k]; }
+function toast(t){ toastText=t; toastT=180; }
+function padKind(id){ id=(id||'').toLowerCase(); return /054c|playstation|dualsense|dualshock|wireless controller/.test(id)?'ps':'xbox'; }
+function padLabels(){ return gpKind==='ps'
+  ? {start:'Risti',rotor:'Risti',laser:'Neliö/R2',bomb:'Ympyrä',pause:'Options'}
+  : {start:'A',rotor:'A',laser:'X/RT',bomb:'B',pause:'Start'}; }
+function currentPad(){
+  const pads=navigator.getGamepads?navigator.getGamepads():[];
+  if(gpIndex!==null && pads[gpIndex] && pads[gpIndex].connected) return pads[gpIndex];
+  for(const p of pads) if(p && p.connected){ gpIndex=p.index; return p; }
+  return null;
+}
+function pollGamepad(){
+  for(const k of INKEYS) gpk[k]=false;
+  let gp=null; try{ gp=currentPad(); }catch(e){ gp=null; }
+  if(!gp) return;
+  const b=i=>{ const x=gp.buttons[i]; return !!x && (x.pressed || x.value>0.5); };
+  const x=gp.axes[0]||0, y=gp.axes[1]||0;
+  axS.left = x < (axS.left?-0.25:-0.35); axS.right = x > (axS.right?0.25:0.35);
+  axS.up   = y < (axS.up?-0.25:-0.35);   axS.down  = y > (axS.down?0.25:0.35);
+  gpk.left = axS.left||b(14); gpk.right = axS.right||b(15);
+  gpk.up   = axS.up||b(12)||b(0); gpk.down = axS.down||b(13);
+  gpk.fire = b(2)||b(7); gpk.bomb = b(1)||b(4)||b(5);
+  gpk.start= b(0)||b(9); gpk.pause = b(9); gpk.mute = b(8);
+  const any=INKEYS.some(k=>gpk[k]);
+  if(any && !gpUsed){
+    gpUsed=true; gpKind=padKind(gp.id); gpName=gpKind==='ps'?'PlayStation':'Xbox / yleinen';
+    toast('Ohjain yhdistetty'); if(touchMode) touchEl.classList.add('gp-hidden');
+  }
+  if(any && touchMode && !touchEl.classList.contains('gp-hidden')) touchEl.classList.add('gp-hidden');
+}
+function rumble(ms,strong,weak){
+  try{ const gp=gpUsed?currentPad():null, a=gp&&gp.vibrationActuator;
+    if(a && a.playEffect) a.playEffect('dual-rumble',{startDelay:0,duration:ms,strongMagnitude:strong,weakMagnitude:weak}).catch(()=>{});
+  }catch(e){}
+}
+addEventListener('gamepadconnected',e=>{ gpIndex=e.gamepad.index; gpKind=padKind(e.gamepad.id); });
+addEventListener('gamepaddisconnected',e=>{
+  if(gpIndex===e.gamepad.index){ gpIndex=null; gpUsed=false; for(const k of INKEYS) gpk[k]=false;
+    if(state==='play') state='paused'; toast('Ohjain irrotettu'); touchEl.classList.remove('gp-hidden'); }
+});
+document.addEventListener('touchstart',()=>touchEl.classList.remove('gp-hidden'),{passive:true,capture:true});
 
 // ---------- scaling ----------
 function fit(){
@@ -597,7 +646,7 @@ function killEnemy(e){ e.alive=false; addScore(50); popups.push({x:e.x+e.w/2+14,
 
 function die(){
   if(state!=='play') return;
-  state='dying'; timer=80; laser=null; vibe([40,30,60,30,220]);
+  state='dying'; timer=80; laser=null; vibe([40,30,60,30,220]); rumble(450,0.9,1);
   burst(player.x+5,player.y+7,24,[C.yellow,C.cyan,C.white,C.lred],3);
   beep(600,0.7,'sawtooth',0.06,-560);
 }
@@ -609,7 +658,7 @@ function explode(d){
   enemies.forEach(e=>{ if(e.alive && Math.hypot(e.x+e.w/2-cx,e.y+e.h/2-cy)<40) killEnemy(e); });
   const pdx=Math.abs(player.x+5-cx), pdy=Math.abs(player.y+7-cy);
   if(state==='play' && pdx<30 && pdy<26) die();
-  flash=12; if(state==='play') vibe(pdx<90&&pdy<70?[90,30,140]:60); noise(0.6,0.35); beep(80,0.5,'square',0.08,-50);
+  flash=12; if(state==='play'){ const near=pdx<90&&pdy<70; vibe(near?[90,30,140]:60); rumble(near?280:120,near?1:0.4,near?0.6:0.3); } noise(0.6,0.35); beep(80,0.5,'square',0.08,-50);
   burst(cx,cy,30,[C.yellow,C.white,C.lred,C.orange],3.5);
 }
 
@@ -631,7 +680,8 @@ function updateParticles(){
   popups=popups.filter(p=>{ p.y-=0.25; p.life--; return p.life>0; });
 }
 
-function update(){
+function update(){ pollGamepad(); mergeInputs(); updateInner(); for(const k of INKEYS) prev[k]=inp[k]; }
+function updateInner(){
   frame++;
   if(pressed('mute')){ muted=!muted; }
   const go = pressed('start')||pressed('fire')||tap;
@@ -660,17 +710,17 @@ function update(){
   energy--; if(energy<=0){ energy=0; die(); return; }
   if(p.inv>0) p.inv--;
 
-  if(keys.left){ p.vx=-1.5; p.face=-1; } else if(keys.right){ p.vx=1.5; p.face=1; } else p.vx=0;
-  if(keys.up){ p.spin=Math.min(p.spin+1,30); if(p.spin>8) p.vy-=0.32; if(frame%5===0) beep(60+p.spin*3,0.06,'square',0.018); }
+  if(inp.left){ p.vx=-1.5; p.face=-1; } else if(inp.right){ p.vx=1.5; p.face=1; } else p.vx=0;
+  if(inp.up){ p.spin=Math.min(p.spin+1,30); if(p.spin>8) p.vy-=0.32; if(frame%5===0) beep(60+p.spin*3,0.06,'square',0.018); }
   else p.spin=Math.max(0,p.spin-2);
   p.anim += p.spin>8?1:(p.spin>0?0.5:0);
-  p.vy+= keys.up ? 0.16 : 0.10; if(keys.down && !p.ground) p.vy+=0.12;
-  p.vy=Math.max(-2,Math.min(keys.down?3:2.6,p.vy));
+  p.vy+= inp.up ? 0.16 : 0.10; if(inp.down && !p.ground) p.vy+=0.12;
+  p.vy=Math.max(-2,Math.min(inp.down?3:2.6,p.vy));
   moveX(p,p.vx); p.ground=false; moveY(p,p.vy);
   if(!p.ground){ const probe={x:p.x,y:p.y+0.5,w:p.w,h:p.h}; if(collides(probe)) p.ground=true; }
 
   // dynamite
-  if((pressed('bomb')||(pressed('down')&&p.ground&&!touchMode)) && !dyn && bombs>0){
+  if((pressed('bomb')||(pressed('down')&&p.ground&&!touchMode&&!gpk.down)) && !dyn && bombs>0){
     bombs--; dyn={x:p.x+p.w/2-2+(p.face>0?2:-2),y:p.y+p.h-10,w:4,h:10,vy:0,t:100,ground:false};
     beep(900,0.05,'square',0.04);
   }
@@ -682,7 +732,7 @@ function update(){
 
   // laser
   laser=null;
-  if(keys.fire){
+  if(inp.fire){
     const ly=p.y+4, sx=p.face>0?p.x+p.w:p.x;
     let len=0, hitTile=null;
     while(len<80){ const tx=Math.floor((sx+p.face*(len+1))/T), ty=Math.floor(ly/T); const c=tile(tx,ty);
@@ -814,15 +864,19 @@ function drawTitle(){
   const hy=70+Math.sin(frame*0.06)*6; drawHero(VW/2-5,hy,1,frame*0.8,false);
   const lines=['Kaivosmiehet jäivät loukkuun.','25 tasoa. Lennä alas, raivaa seinät','ja pelasta joka tasolta yksi mies.'];
   lines.forEach((l,i)=>txt(l,VW/2,100+i*12,C.white,8,'center'));
-  if(frame%60<40) txt(touchMode?'Napauta oikealta aloittaaksesi':'Paina välilyöntiä',VW/2,138,C.yellow,8,'center',true);
+  const startMsg = gpUsed ? 'Paina '+padLabels().start+' aloittaaksesi' : (touchMode?'Napauta oikealta aloittaaksesi':'Paina välilyöntiä');
+  if(frame%60<40) txt(startMsg,VW/2,138,C.yellow,8,'center',true);
   if(unlocked>0) txt('< Aloitustaso '+(startSel+1)+' / '+LEVELS.length+' >',VW/2,152,C.cyan,8,'center');
   R(0,VH,VW,62,'#6C6C6C'); R(0,VH+62,VW,HUD-62,'#000');
   txt('Ennätys',VW/2,VH+12,C.white,8,'center',true);
   txt(String(hi),VW/2,VH+28,C.yellow,16,'center',true);
+  if(gpUsed){ const L=padLabels(); txt('Lento '+L.rotor+'   Laser '+L.laser+'   Dyn. '+L.bomb+'   Tauko '+L.pause,VW/2,VH+50,C.lgrey,8,'center'); }
+  else if(!touchMode && navigator.getGamepads) txt('Peliohjain? Paina mitä tahansa sen nappia',VW/2,VH+50,C.lgrey,8,'center');
 }
+function drawToast(){ if(toastT>0){ toastT--; const w=Math.max(120,toastText.length*7+20); R(VW/2-w/2,6,w,16,'#000'); R(VW/2-w/2,6,w,1,C.cyan); txt(toastText,VW/2,10,C.cyan,8,'center'); } }
 function render(){
   R(0,0,VW,VH+HUD,'#000');
-  if(state==='title'){ drawTitle(); return; }
+  if(state==='title'){ drawTitle(); drawToast(); return; }
   const lit = !dark || flash>0;
   if(lit && levelCv) ctx.drawImage(levelCv,curSX*VW,curSY*VH,VW,VH,0,0,VW,VH);
   if(flash>0 && flash%4<2){ ctx.globalAlpha=0.25; R(0,0,VW,VH,C.white); ctx.globalAlpha=1; }
@@ -842,18 +896,19 @@ function render(){
   drawHUD();
   if(banner>0 && state==='play') txt('Taso '+(levelIdx%LEVELS.length+1)+' / '+LEVELS.length+(loop?' – kierros '+(loop+1):''),VW/2,VH/2-30,C.yellow,8,'center');
   if(state==='paused'){ R(VW/2-60,VH/2-14,120,28,'#000'); txt('Tauko',VW/2,VH/2-4,C.white,8,'center'); }
+  drawToast();
   if(state==='clear'){ R(VW/2-90,VH/2-24,180,48,'#000'); R(VW/2-90,VH/2-24,180,2,C.yellow);
     txt('Kaivosmies pelastettu!',VW/2,VH/2-14,C.yellow,8,'center'); txt('Bonus lasketaan',VW/2,VH/2+4,C.white,8,'center'); }
   if(state==='over'){ R(VW/2-80,VH/2-26,160,52,'#000'); R(VW/2-80,VH/2-26,160,2,C.lred);
     txt('Peli päättyi',VW/2,VH/2-16,C.lred,8,'center'); txt('Pisteet '+score,VW/2,VH/2-2,C.white,8,'center');
-    if(timer<=0) txt(touchMode?'Napauta jatkaaksesi':'Paina välilyöntiä',VW/2,VH/2+12,C.yellow,8,'center'); }
+    if(timer<=0) txt(gpUsed?'Paina '+padLabels().start+' jatkaaksesi':touchMode?'Napauta jatkaaksesi':'Paina välilyöntiä',VW/2,VH/2+12,C.yellow,8,'center'); }
 }
 
 // ---------- loop ----------
 let last=0, acc=0; const STEP=1000/60;
 function tick(ts){
   if(!last) last=ts; acc+=Math.min(100,ts-last); last=ts;
-  while(acc>=STEP){ update(); for(const k in keys) prev[k]=keys[k]; acc-=STEP; }
+  while(acc>=STEP){ update(); acc-=STEP; }
   render(); requestAnimationFrame(tick);
 }
 if(document.fonts && document.fonts.load){ document.fonts.load("8px Silkscreen").catch(()=>{}); document.fonts.load("700 16px Silkscreen").catch(()=>{}); }

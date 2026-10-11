@@ -76,7 +76,9 @@ body.touch #touch.on{display:block}
 body.touch.autogas .tb[data-k="gas"]{opacity:.45}
 body.touch #bl{bottom:auto;top:calc(118px + env(safe-area-inset-top,0px));min-width:0;padding:6px 10px}
 body.touch #spd{font-size:26px}
-body.touch #hudBtns{bottom:auto;top:calc(76px + env(safe-area-inset-top,0px));right:50%;transform:translateX(50%)}
+body.touch #hudBtns{bottom:auto;right:auto;transform:none;gap:5px}
+body.touch #camBtn{display:none}
+body.touch #hudBtns .btn{font-size:10px;padding:.25em .38em;border-width:1px}
 body.touch .dashp{bottom:calc(8px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) scale(.8);transform-origin:bottom center}
 body.touch #hud.cockpit #bl{opacity:0}
 #rotHint{display:none;position:absolute;left:50%;top:44%;transform:translateX(-50%);padding:10px 14px;font-family:var(--pixel);font-size:13px;text-align:center;pointer-events:none}
@@ -162,6 +164,26 @@ kbd{font-family:var(--pixel);font-size:11px;background:var(--wb-grey);color:var(
 #menu .tcard{background:rgba(0,26,58,.42)}
 #menu .tcard[aria-pressed="true"]{background:rgba(255,136,0,.13)}
 #menu .sub,#menu .keys,#menu .tcard p,#menu .tcard .meta{text-shadow:0 1px 2px rgba(0,0,0,.7)}
+
+/* Peliohjain */
+.padkeys{display:none}
+body.pad .padkeys{display:block}
+body.pad .kbkeys{display:none}
+.gpfocus,.btn:focus-visible,.tcard:focus-visible{outline:3px solid var(--wb-orange)!important;outline-offset:3px}
+
+/* Mobiili: pieni kartta, jotta turbonappi näkyy */
+body.touch #tr{padding:4px 6px}
+body.touch #map{width:40px;height:40px}
+body.touch #pos{font-size:12px;margin-top:2px}
+body.touch #gapTxt{display:none}
+/* Kehotus kääntää puhelin vaakatasoon */
+#rotateGate{display:none;position:fixed;inset:0;z-index:40;place-items:center;padding:24px;background:rgba(0,0,34,.92);text-align:center}
+@media (orientation:portrait){ body.touch #rotateGate:not(.dismissed){display:grid} }
+#rotateGate .ph{font-size:64px;display:inline-block;animation:rotph 2.2s ease-in-out infinite}
+@keyframes rotph{0%,20%{transform:rotate(0)}50%,80%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
+@media (prefers-reduced-motion: reduce){ #rotateGate .ph{animation:none;transform:rotate(-90deg)} }
+#rotateGate h2{font-size:18px;margin:14px 0 8px}
+#rotateGate p{color:var(--muted);margin:0 0 18px;max-width:30ch}
 </style>
 </head>
 <body>
@@ -198,6 +220,13 @@ kbd{font-family:var(--pixel);font-size:11px;background:var(--wb-grey);color:var(
   <div class="tb" data-k="gas">Kaasu</div>
 </div>
 
+<div id="rotateGate" role="dialog" aria-label="Käännä puhelin">
+  <div><div class="ph" aria-hidden="true">📱</div>
+  <h2>Käännä puhelin vaakatasoon</h2>
+  <p>Taivasrata pelataan vaakatasossa: ohjaus vasemmalla peukalolla, kaasu ja turbo oikealla.</p>
+  <button class="btn" id="rotateSkip">Jatka silti pystyssä</button></div>
+</div>
+
 <div id="menu" class="screen">
   <div class="window panel">
     <div class="titlebar"><span class="gad"></span><span>Taivasrata.exe</span><span class="stripes"></span><span class="gad"></span></div>
@@ -218,7 +247,8 @@ kbd{font-family:var(--pixel);font-size:11px;background:var(--wb-grey);color:var(
         <p class="sub" style="margin:8px 0 0">Vasen peukalo ohjaa liu'uttamalla, oikealla kaasu, jarru ja turbo. Automaattikaasulla auto kiihdyttää itse ja sinä vain ohjaat ja jarrutat.</p>
       </div>
       <div class="foot">
-        <div class="keys"><kbd>↑</kbd> kaasu &nbsp; <kbd>↓</kbd> jarru / peruutus &nbsp; <kbd>←</kbd><kbd>→</kbd> ohjaus<br><kbd>Välilyönti</kbd> turbo &nbsp; <kbd>C</kbd> ohjaamo / takanäkymä &nbsp; <kbd>M</kbd> äänet &nbsp; <kbd>P</kbd> tauko</div>
+        <div class="keys padkeys">🎮 <kbd>Vasen tikku</kbd> ohjaus &nbsp; <kbd>RT</kbd> kaasu &nbsp; <kbd>LT</kbd> jarru &nbsp; <kbd>A</kbd>/<kbd>RB</kbd> turbo<br><kbd>Y</kbd> kuvakulma &nbsp; <kbd>Start</kbd> tauko &nbsp; <kbd>Back</kbd> äänet &nbsp; valikoissa <kbd>A</kbd> valitse, <kbd>B</kbd> takaisin</div>
+        <div class="keys kbkeys"><kbd>↑</kbd> kaasu &nbsp; <kbd>↓</kbd> jarru / peruutus &nbsp; <kbd>←</kbd><kbd>→</kbd> ohjaus<br><kbd>Välilyönti</kbd> turbo &nbsp; <kbd>C</kbd> ohjaamo / takanäkymä &nbsp; <kbd>M</kbd> äänet &nbsp; <kbd>P</kbd> tauko<br><span style="opacity:.8">🎮 Peliohjain: paina mitä tahansa ohjaimen nappia</span></div>
         <div class="actions" style="margin:0"><button class="btn" id="contBtn" hidden>Jatka sarjaa</button><button class="btn primary" id="startBtn">Aja kisa</button></div>
       </div>
     </div>
@@ -831,7 +861,9 @@ function stepCar(c, inp, dt) {
   if (c.state === 'crane') return stepCrane(c, dt);
   const tr = track;
   if (c.isAI) c.steer = inp.steer; else c.steer += clamp(inp.steer - c.steer, -dt * 6, dt * 6);
-  c.gas = inp.gas || inp.boost;
+  // kaasu ja jarru voivat olla portaattomia (0–1, peliohjaimen liipaisimet) tai tosi/epätosi
+  const gasA = typeof inp.gas === 'number' ? inp.gas : (inp.gas ? 1 : 0), brkA = typeof inp.brake === 'number' ? inp.brake : (inp.brake ? 1 : 0);
+  c.gas = gasA > 0.05 || inp.boost;
   const sm = samp(tr, c.s); const k = sm.k;
   const av = Math.abs(c.v);
   let omega = 0;
@@ -848,12 +880,12 @@ function stepCar(c, inp, dt) {
     else if (c.inWall) a -= G * Math.sin(c.wallTh);
     else if (c.inCork) a -= G * c.cork.Rc * Math.sin(c.corkTh) * 2 * Math.PI / c.cork.Ls;
     else { const sl = slopeAt(tr, c.s); a -= G * sl / Math.sqrt(1 + sl * sl); }
-    const canBoost = inp.boost && c.boost > 0 && !inp.brake;
+    const canBoost = inp.boost && c.boost > 0 && brkA < 0.2;
     const trac = c.inWall ? Math.max(0.05, Math.cos(c.wallTh) ** 2) : 1; // pitoa jyrkällä seinällä vähemmän
     if (canBoost) { c.boosting = true; c.boost = Math.max(0, c.boost - 18 * dt); a += trac * tr.accMul * 24 * Math.max(0, 1 - c.v / 74); }
-    else if (inp.gas) a += trac * tr.accMul * 15 * Math.max(0, 1 - c.v / 58);
-    if (inp.brake) { if (c.v > 0.5) a -= 26 * tr.brakeMul; else if (c.v > -8) a -= 7; }
-    if (!inp.gas && !inp.brake && !canBoost) a -= 0.7 * Math.sign(c.v) * Math.min(1, av);
+    else if (gasA > 0) a += gasA * trac * tr.accMul * 15 * Math.max(0, 1 - c.v / 58);
+    if (brkA > 0) { if (c.v > 0.5) a -= brkA * 26 * tr.brakeMul; else if (c.v > -8) a -= brkA * 7; }
+    if (gasA < 0.05 && brkA < 0.05 && !canBoost) a -= 0.7 * Math.sign(c.v) * Math.min(1, av);
     a -= Math.abs(Math.sin(c.psi)) * c.v * 0.6;
   }
   c.v += a * dt;
@@ -1608,8 +1640,9 @@ function playerInput() {
   if (gameState !== 'race' || player.finished || player.wrecked) return { steer: 0, gas: false, brake: true, boost: false };
   const l = keys.ArrowLeft || keys.KeyA, r = keys.ArrowRight || keys.KeyD;
   const kSteer = (r ? 1 : 0) - (l ? 1 : 0);
-  const gas = !!(keys.ArrowUp || keys.KeyW || touch.gas || (touchMode && autoGas && !touch.brake));
-  return { steer: kSteer !== 0 ? kSteer : touch.steer, gas, brake: !!(keys.ArrowDown || keys.KeyS || touch.brake), boost: !!(keys.Space || keys.ShiftLeft || touch.boost) };
+  const kGas = keys.ArrowUp || keys.KeyW || touch.gas || (touchMode && autoGas && !touch.brake) ? 1 : 0;
+  const kBrk = keys.ArrowDown || keys.KeyS || touch.brake ? 1 : 0;
+  return { steer: kSteer !== 0 ? kSteer : (touch.steer || pad.steer), gas: Math.max(kGas, pad.gas), brake: Math.max(kBrk, pad.brake), boost: !!(keys.Space || keys.ShiftLeft || touch.boost || pad.boost) };
 }
 // ---------- Kosketusohjaus ----------
 function setTouchMode(on) {
@@ -1623,9 +1656,93 @@ window.addEventListener('touchstart', () => setTouchMode(true), { passive: true 
 window.addEventListener('keydown', e => { if (/^(Arrow|Key[WASD])/.test(e.code)) setTouchMode(false); });
 try { autoGas = localStorage.getItem('taivasrata-autokaasu') === '1'; } catch (e) {}
 function syncAutoGas() { $('autoGasBtn').setAttribute('aria-pressed', autoGas); document.body.classList.toggle('autogas', autoGas); }
+$('rotateSkip').onclick = () => $('rotateGate').classList.add('dismissed');
+// vaakasuunnan lukitus kisan alussa, jos selain sallii (vaatii yleensä koko näytön tilan)
+function tryLandscape() {
+  if (!touchMode) return;
+  const el = document.documentElement;
+  const lock = () => { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch (e) {} };
+  try { if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen({ navigationUI: 'hide' }).then(lock).catch(() => {}); else lock(); } catch (e) {}
+}
 $('autoGasBtn').onclick = () => { autoGas = !autoGas; try { localStorage.setItem('taivasrata-autokaasu', autoGas ? '1' : '0'); } catch (e) {} syncAutoGas(); };
 syncAutoGas();
-const buzz = ms => { if (touchMode && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} };
+const buzz = ms => {
+  if (touchMode && navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {}
+  const len = Array.isArray(ms) ? ms.reduce((a, b) => a + b, 0) : ms; rumble(Math.min(1, len / 120), len);
+};
+// ---------- Peliohjain (Gamepad API) ----------
+const pad = { steer: 0, gas: 0, brake: 0, boost: false, idx: -1, prev: [], navT: 0, navDir: '', active: false };
+// Peliohjainta ei aina saa käyttää (esim. upotetussa näkymässä, jonka käyttöoikeuskäytäntö estää sen): silloin ohjain ohitetaan hiljaa
+let padAllowed = true;
+function getPad() {
+  if (!padAllowed || !navigator.getGamepads) return null;
+  let ps;
+  try { ps = navigator.getGamepads() || []; } catch (e) { padAllowed = false; return null; }
+  for (const p of ps) if (p && p.connected) return p;
+  return null;
+}
+function rumble(strength, ms) {
+  if (!pad.active) return; const p = getPad(); const va = p && p.vibrationActuator;
+  if (va && va.playEffect) try { va.playEffect('dual-rumble', { duration: Math.max(40, ms), strongMagnitude: strength, weakMagnitude: Math.min(1, strength * 0.7) }); } catch (e) {}
+}
+function setPadMode(on) {
+  if (pad.active === on) return; pad.active = on; document.body.classList.toggle('pad', on);
+  if (on) { setTouchMode(false); setTouchVisible(false); }
+}
+window.addEventListener('gamepadconnected', () => { setPadMode(true); showMsg('🎮 Peliohjain yhdistetty', 'info'); });
+window.addEventListener('gamepaddisconnected', () => { if (!getPad()) { setPadMode(false); pad.steer = pad.gas = pad.brake = 0; pad.boost = false; if (gameState === 'race' || gameState === 'countdown') togglePause(); showMsg('Peliohjain irrotettu', 'bad'); } });
+const PAD_DZ = 0.12;
+function activeScreen() { for (const id of ['result', 'pause', 'champ', 'menu']) { const e = $(id); if (!e.classList.contains('hidden')) return e; } return null; }
+function padFocusables(scr) { return [...scr.querySelectorAll('button')].filter(b => b.offsetParent !== null && !b.hidden && !b.disabled); }
+function padMove(dir) {
+  const scr = activeScreen(); if (!scr) return; const els = padFocusables(scr); if (!els.length) return;
+  const cur = els.includes(document.activeElement) ? document.activeElement : null;
+  if (!cur) { els[0].focus(); markPadFocus(els[0]); return; }
+  const r0 = cur.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
+  let best = null, bs = 1e9;
+  for (const e of els) {
+    if (e === cur) continue; const r = e.getBoundingClientRect(), x = r.left + r.width / 2 - cx, y = r.top + r.height / 2 - cy;
+    const along = dir === 'left' ? -x : dir === 'right' ? x : dir === 'up' ? -y : y, across = dir === 'left' || dir === 'right' ? Math.abs(y) : Math.abs(x);
+    if (along <= 4) continue; const sc = along + across * 2.2; if (sc < bs) { bs = sc; best = e; }
+  }
+  if (best) { best.focus(); best.scrollIntoView({ block: 'nearest' }); markPadFocus(best); }
+}
+function markPadFocus(el) { document.querySelectorAll('.gpfocus').forEach(e => e.classList.remove('gpfocus')); el.classList.add('gpfocus'); }
+function padBack() {
+  if (gameState === 'paused') return togglePause();
+  const scr = activeScreen(); if (!scr) return;
+  const back = [...scr.querySelectorAll('button')].find(b => /Valikkoon/.test(b.textContent) && b.offsetParent !== null);
+  if (back) back.click();
+}
+function pollGamepad(dt) {
+  if (!padAllowed) return;
+  const p = getPad(); if (!p) { pad.steer = pad.gas = pad.brake = 0; pad.boost = false; return; }
+  const b = i => p.buttons[i] ? (p.buttons[i].value || (p.buttons[i].pressed ? 1 : 0)) : 0, pr = i => b(i) > 0.5;
+  const pressed = i => pr(i) && !pad.prev[i];
+  const any = p.buttons.some(x => x.pressed) || p.axes.some(a => Math.abs(a) > 0.5);
+  if (any) setPadMode(true);
+  // ajo
+  let x = p.axes[0] || 0; x = Math.abs(x) < PAD_DZ ? 0 : Math.sign(x) * Math.pow((Math.abs(x) - PAD_DZ) / (1 - PAD_DZ), 1.4);
+  if (pr(14)) x = -1; if (pr(15)) x = 1;
+  pad.steer = x; pad.gas = b(7) > 0.04 ? b(7) : 0; pad.brake = b(6) > 0.04 ? b(6) : 0; pad.boost = pr(0) || pr(5);
+  const inRace = gameState === 'race' || gameState === 'countdown' || gameState === 'over';
+  if (inRace && gameState !== 'paused') {
+    if (pressed(3)) toggleCam();
+    if (pressed(9)) togglePause();
+    if (pressed(8)) toggleMute();
+    if (player && player.boosting && pad.active && (pad.boostT = (pad.boostT || 0) - dt) <= 0) { pad.boostT = 0.25; rumble(0.15, 260); }
+  } else {
+    // valikot: ristiohjain tai vasen tikku, A valitsee, B takaisin, Start aloittaa / jatkaa
+    const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
+    const dir = pr(12) || ay < -0.6 ? 'up' : pr(13) || ay > 0.6 ? 'down' : pr(14) || ax < -0.6 ? 'left' : pr(15) || ax > 0.6 ? 'right' : '';
+    if (dir) { if (dir !== pad.navDir) { padMove(dir); pad.navT = 0.35; } else if ((pad.navT -= dt) <= 0) { padMove(dir); pad.navT = 0.15; } }
+    pad.navDir = dir;
+    if (pressed(0)) { const el = document.activeElement; if (el && el.tagName === 'BUTTON' && activeScreen() && activeScreen().contains(el)) el.click(); else padMove('down'); }
+    if (pressed(1)) padBack();
+    if (pressed(9)) { if (gameState === 'paused') togglePause(); else if (gameState === 'menu') $('startBtn').click(); else { const pb = activeScreen() && activeScreen().querySelector('.btn.primary'); if (pb) pb.click(); } }
+  }
+  pad.prev = p.buttons.map(x => x.pressed);
+}
 function setTouchVisible(v) { $('touch').classList.toggle('on', !!v); }
 document.querySelectorAll('.tb').forEach(el => {
   const k = el.dataset.k;
@@ -1807,6 +1924,10 @@ function updateHUD(dt) {
   const gapM = Math.abs(c.dist - ai.dist);
   $('gapTxt').textContent = gapM < 5 ? 'Rinnakkain' : (ahead ? 'Johdat ' : 'Takana ') + Math.round(gapM) + ' m';
   drawCrack(c.damage); drawMap();
+  // mobiilissa ääni- ja taukonapit nopeusnäytön viereen
+  const hb = $('hudBtns');
+  if (touchMode) { const r = $('bl').getBoundingClientRect(); hb.style.left = (r.right + 8) + 'px'; hb.style.top = r.top + 'px'; }
+  else if (hb.style.left) { hb.style.left = ''; hb.style.top = ''; }
   if (camBlend > 0.01) {
     $('dSpd').textContent = Math.round(Math.abs(c.v) * 3.6);
     $('dBoost').style.width = c.boost + '%';
@@ -1834,7 +1955,7 @@ function stepRace(dt) {
   const pi = playerInput();
   stepCar(player, pi, dt);
   stepCar(ai, ai.finished ? { steer: aiInput(ai, null, 20).steer, gas: false, brake: ai.v > 15, boost: false } : aiInput(ai, player, aiTop), dt);
-  collideCars(player, ai, rel => { if (rel > 2) sfxThud(Math.min(1, rel / 12)); });
+  collideCars(player, ai, rel => { if (rel > 2) { sfxThud(Math.min(1, rel / 12)); rumble(Math.min(1, rel / 10), 120); } });
   raceTime += dt; TT += dt;
   // liikkuvan nostosillan kulma ruudulle lähestyttäessä
   for (const b of track.bridges) {
@@ -1866,7 +1987,7 @@ function showResult() {
   $('result').classList.remove('hidden'); $('againBtn').focus();
 }
 function startRace() {
-  initAudio();
+  initAudio(); tryLandscape();
   if (mode === 'champ' && champ) {
     trackIdx = champ.tracks[champ.round]; curOpp = DRIVERS[champ.opp[champ.round]]; aiTop = oppSkill(curOpp);
     aMesh.mBody.color.setHex(curOpp.color); aMesh.mAcc.color.setHex(curOpp.acc);
@@ -1874,7 +1995,7 @@ function startRace() {
   $('champ').classList.add('hidden'); $('restartBtn').hidden = mode === 'champ';
   setupRace(trackIdx);
   $('menu').classList.add('hidden'); $('result').classList.add('hidden'); $('pause').classList.add('hidden'); $('hud').classList.remove('hidden');
-  $('touch').classList.add('on');
+  if (!pad.active) $('touch').classList.add('on');
   gameState = 'countdown'; countT = 3.6; $('msg').style.opacity = 0;
   if (track.weather !== 'clear') {
     const w = WEATHER[track.weather], tip = { night: 'pimeää – seuraa heijastimia', snow: 'liukasta: pito 55 %, jarrut heikot', rain: 'märkää: pito 68 %, jarrutusmatkat pidempiä', fog: 'näkyvyys alle 100 m' }[track.weather];
@@ -2051,6 +2172,7 @@ let last = performance.now(), acc = 0; const DT = 1 / 120;
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = clamp((now - last) / 1000, 0, 0.05); last = now;
+  pollGamepad(dt);
   if (gameState !== 'paused') updateBridges();
   if (gameState === 'menu' || gameState === 'champ') {
     TT += dt; menuCamera(dt);
