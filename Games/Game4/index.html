@@ -28,6 +28,10 @@ body{margin:0;min-height:100%;background:var(--page);color:var(--ink);
   aspect-ratio:16/10;background:var(--frame);border:3px solid #000;box-shadow:0 0 0 2px var(--wb),0 12px 40px rgba(0,0,0,.35);overflow:hidden}
 #game{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
 .ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,18,52,.72);color:var(--white);padding:12px;overflow:hidden}
+.ov.menubg{background:rgba(0,18,52,.29)}
+.ov.menubg .panel{background:rgba(0,85,170,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.ov.menubg .keys>div{background:rgba(0,51,119,.55)}
+.ov.menubg .sub,.ov.menubg .tiny,.ov.menubg .keys{text-shadow:1px 1px 0 rgba(0,0,0,.8)}
 .ov.hidden{display:none}
 .panel{background:var(--wb);border:2px solid var(--white);outline:2px solid #000;padding:14px 16px;width:min(620px,100%);max-height:100%;overflow:auto;
   box-shadow:6px 6px 0 rgba(0,0,0,.45)}
@@ -128,7 +132,7 @@ html.touchmode .copper{height:26px;margin:-10px -12px 8px}
     <button id="pauseBtn" type="button">II</button>
     <div id="tbtns">
       <button data-w="rear">TAKA</button><button data-w="front" class="big">ETU</button>
-      <button data-w="mine">MIINA</button><button data-w="brake">JARRU</button>
+      <button data-w="mine">MIINA</button><button data-w="brake" aria-label="Jarru ja pakki">JARRU/<br>PAKKI</button>
     </div>
   </div>
 </div>
@@ -475,7 +479,7 @@ function makeCar(d,slot,T,demo){
   ai:{skill:h?0.84:(demo?0.93+Math.random()*0.05:Math.min(1.08,0.86+0.045*(div-1)+0.012*rn+Math.random()*0.05)),
    lane:0,laneT:0,laneTarget:0,stuck:0,revT:0,revSteer:1,wait:false}};
 }
-const topSpeed=c=>(3.0+0.33*c.engine)*(1-c.damage/260)*((c.human&&!c.finished)?1:c.ai.skill);
+const topSpeed=c=>(3.0+0.33*c.engine)*(1-c.damage/600)*((c.human&&!c.finished)?1:c.ai.skill);
 
 const TS={sx:0,bx:0,by:0,id:null,ox:0,oy:0,mag:0,ang:0,brake:false,front:false,rear:false,mine:false};
 const mq=q=>!!(window.matchMedia&&window.matchMedia(q).matches);
@@ -1010,7 +1014,7 @@ function setTouch(on){
 }
 function showOv(html){
  const old=ov.querySelector('.panel'),sc=old?old.scrollTop:0;
- ov.innerHTML=html; ov.classList.remove('hidden'); setTouch(false);
+ ov.innerHTML=html; ov.classList.remove('hidden','menubg'); setTouch(false);
  const p=ov.querySelector('.panel'); if(p)p.scrollTop=sc;
  if(GP.active)padRefocus();
 }
@@ -1030,10 +1034,11 @@ function showMenu(){
   <div><b>Pelaaja 1</b><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ajo<br><kbd>F</kbd> etuohjus, <kbd>G</kbd> takaohjus<br><kbd>H</kbd> miina</div>
   <div><b>Pelaaja 2</b>nuolinäppäimet ajo<br><kbd>,</kbd> etuohjus, <kbd>.</kbd> takaohjus<br><kbd>-</kbd> miina</div>
  </div>
- <p class="touchonly sub" style="font-size:13px">Kaasu on päällä automaattisesti. Ohjaa liu'uttamalla peukaloa vasemmalle tai oikealle ruudun vasemmalla puolella. JARRU hidastaa, ja kun pidät sitä pohjassa auton pysähdyttyä, auto peruuttaa. Oikealla ovat aseet ja jarru, ylhäällä tauko.</p>
+ <p class="touchonly sub" style="font-size:13px">Kaasu on päällä automaattisesti. Ohjaa liu'uttamalla peukaloa vasemmalle tai oikealle ruudun vasemmalla puolella. JARRU/PAKKI hidastaa, ja kun pidät sitä pohjassa auton pysähdyttyä, auto peruuttaa. Oikealla ovat aseet ja JARRU/PAKKI, ylhäällä tauko.</p>
  <p class="padonly sub" style="font-size:13px"><b class="px" style="font-size:9px;color:var(--orange)">Peliohjain</b><br>Vasen tatti tai ristiohjain ohjaa, RT kaasu ja LT jarru (portaattomat). A etuohjus, B takaohjus, X tai olkanappi miina, Start tauko. Valikoissa ristiohjain liikkuu, A valitsee ja B palaa.</p>
  <p class="tiny">Kausi on ${SEASON} kisaa. Pisteet 10, 7, 5, 4, 3, 2 ja 1. Voita mestaruus, niin nouset kovempaan divisioonaan.<span class="kbonly"> <kbd>P</kbd> tauko, <kbd>M</kbd> ääni.</span> Peliohjain toimii myös: paina mitä tahansa sen nappia.</p>
  </div>`);
+ ov.classList.add('menubg');
 }
 function standingsTable(){
  const st=G.drivers.slice().sort((a,b)=>b.points-a.points);

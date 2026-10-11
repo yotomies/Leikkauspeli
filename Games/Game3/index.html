@@ -50,9 +50,9 @@ body.touchmode main{padding:0;gap:0}
 .touch{display:none;position:fixed;inset:0;z-index:5;touch-action:none;-webkit-touch-callout:none}
 .touch.on{display:block}
 .touch.on.gp-hidden{display:none}
-.stick{position:fixed;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;
+.stick{position:fixed;width:var(--ss,124px);height:var(--ss,124px);margin:calc(var(--ss,124px) / -2) 0 0 calc(var(--ss,124px) / -2);border-radius:50%;
   border:2px solid rgba(255,255,255,.4);background:rgba(64,49,141,.28);pointer-events:none;opacity:.45;
-  left:calc(env(safe-area-inset-left,0px) + 96px);top:calc(100% - env(safe-area-inset-bottom,0px) - 96px)}
+  left:calc(env(safe-area-inset-left,0px) + var(--sx,96px));top:calc(100% - env(safe-area-inset-bottom,0px) - var(--sy,96px))}
 .stick.active{opacity:1}
 .knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;
   background:rgba(255,255,255,.45);border:2px solid rgba(255,255,255,.75)}
@@ -60,13 +60,23 @@ body.touchmode main{padding:0;gap:0}
   background:rgba(64,49,141,.5);border:2px solid rgba(167,156,240,.85);touch-action:none;
   -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
 .tb.down{background:rgba(167,156,240,.9);color:#000}
-.laser{width:96px;height:96px;right:calc(env(safe-area-inset-right,0px) + 22px);bottom:calc(env(safe-area-inset-bottom,0px) + 26px)}
-.bomb{width:66px;height:66px;right:calc(env(safe-area-inset-right,0px) + 128px);bottom:calc(env(safe-area-inset-bottom,0px) + 100px)}
+.laser{width:var(--lb,96px);height:var(--lb,96px);right:calc(env(safe-area-inset-right,0px) + var(--lr,22px));bottom:calc(env(safe-area-inset-bottom,0px) + 22px)}
+.bomb{width:var(--db,66px);height:var(--db,66px);right:calc(env(safe-area-inset-right,0px) + var(--dr,37px));bottom:calc(env(safe-area-inset-bottom,0px) + var(--dbt,132px))}
 .tools{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);right:calc(env(safe-area-inset-right,0px) + 8px);display:flex;gap:8px}
 .tools .tb{position:static;width:42px;height:42px;border-radius:8px;font-size:11px}
 .rotate{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);
   font-size:10px;color:var(--muted);text-align:center;pointer-events:none;max-width:140px}
-@media (orientation: portrait){ .touch.on .rotate{display:block;bottom:auto;top:calc(env(safe-area-inset-top,0px) + 83.75vw + 24px)} .tools{top:calc(env(safe-area-inset-top,0px) + 83.75vw + 14px)} }
+@media (orientation: portrait){ .tools{top:calc(env(safe-area-inset-top,0px) + 83.75vw + 14px)} }
+.gate{display:none;position:fixed;inset:0;z-index:20;background:var(--frame);color:#fff;
+  flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center;padding:24px;touch-action:none}
+@media (orientation: portrait){ .gate.on{display:flex} }
+.gate h2{font-size:18px;margin:0;font-weight:700}
+.gate p{font-size:12px;margin:0;color:var(--muted);max-width:28ch;line-height:1.6}
+.phone{width:46px;height:80px;border:4px solid #fff;border-radius:9px;position:relative;animation:turn 2.4s ease-in-out infinite}
+.phone::after{content:'';position:absolute;left:50%;bottom:5px;width:8px;height:3px;margin-left:-4px;background:#fff}
+@keyframes turn{0%,25%{transform:rotate(0)}55%,85%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
+@media (prefers-reduced-motion: reduce){ .phone{animation:none;transform:rotate(-90deg)} }
+.gate button{font-family:inherit;font-size:12px;color:#fff;background:transparent;border:2px solid var(--keyline);padding:10px 16px}
 @media (prefers-reduced-motion: reduce){ *{scroll-behavior:auto} }
 </style>
 </head>
@@ -82,7 +92,12 @@ body.touchmode main{padding:0;gap:0}
       <button class="tb small" data-k="pause" aria-label="Tauko">II</button>
       <button class="tb small" id="fsBtn" aria-label="Koko näyttö">[ ]</button>
     </div>
-    <div class="rotate">Käännä puhelin vaakaan</div>
+  </div>
+  <div class="gate" id="gate" role="dialog" aria-label="Käännä laite vaakatasoon">
+    <div class="phone" aria-hidden="true"></div>
+    <h2>Käännä laite vaakatasoon</h2>
+    <p>Syvä kuilu pelataan parhaiten puhelin vaakatasossa: peli täyttää näytön ja peukalot ovat ohjaimilla.</p>
+    <button id="gateSkip">Pelaa pystyssä</button>
   </div>
   <p class="help" id="help">
     <kbd>←</kbd><kbd>→</kbd> liiku &nbsp; <kbd>↑</kbd> roottori &nbsp; <kbd>↓</kbd> laskeudu tai pudota dynamiitti maassa<br>
@@ -314,7 +329,11 @@ function enableTouch(){
   document.body.classList.add('touchmode');
   document.getElementById('help').style.display='none';
   touchEl.classList.add('on'); fit();
+  const gate=document.getElementById('gate');
+  if(!gateSkipped) gate.classList.add('on');
 }
+let gateSkipped=false;
+document.getElementById('gateSkip').addEventListener('click',()=>{ gateSkipped=true; document.getElementById('gate').classList.remove('on'); });
 // --- touch tracking: each finger is a joystick, a button or a plain tap ---
 const active=new Map(); let sid=null, ox=0, oy=0; const RAD=48;
 function place(){ stick.style.left=ox+'px'; stick.style.top=oy+'px'; }
@@ -437,7 +456,20 @@ document.addEventListener('touchstart',()=>touchEl.classList.remove('gp-hidden')
 function fit(){
   if(touchMode){
     const s=Math.min(window.innerWidth/VW, window.innerHeight/(VH+HUD));
-    cv.style.width=Math.floor(VW*s)+'px'; cv.style.height=Math.floor((VH+HUD)*s)+'px'; return;
+    const cw=Math.floor(VW*s);
+    cv.style.width=cw+'px'; cv.style.height=Math.floor((VH+HUD)*s)+'px';
+    const st=document.documentElement.style;
+    let L=96, lr=22, SS=124, sx=96;
+    if(window.innerWidth>window.innerHeight){
+      const margin=(window.innerWidth-cw)/2;
+      L=Math.round(Math.max(56,Math.min(96,margin-20))); lr=Math.round(Math.max(6,(margin-L)/2));
+      SS=Math.round(Math.max(80,Math.min(124,margin-12))); sx=Math.round(Math.max(SS/2+4,margin/2));
+    }
+    st.setProperty('--ss',SS+'px'); st.setProperty('--sx',sx+'px'); st.setProperty('--sy',(SS/2+24)+'px');
+    const D=Math.round(L*0.72);
+    st.setProperty('--lb',L+'px'); st.setProperty('--lr',lr+'px');
+    st.setProperty('--db',D+'px'); st.setProperty('--dr',(lr+(L-D)/2)+'px'); st.setProperty('--dbt',(22+L+14)+'px');
+    return;
   }
   const helpEl=document.getElementById('help');
   const helpH = helpEl.style.display==='none' ? 0 : helpEl.offsetHeight+14;
