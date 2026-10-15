@@ -191,6 +191,9 @@ body.full:not(.touch).fight #combatui{display:block;position:fixed;left:50%;bott
  background:rgba(10,8,5,.78);border:1px solid var(--edge);border-radius:4px;padding:4px 12px;pointer-events:none;animation:hintfade 1s 7s forwards}
 body.full:not(.touch).fight #combatui #keys,body.full:not(.touch).fight #combatui #padkeys{margin:0;font-size:14px}
 @keyframes hintfade{to{opacity:0}}
+#bgfill{display:none}
+body:is(.touch,.full).ingame #bgfill{display:block;position:absolute;inset:-60px;z-index:-1;background-size:cover;background-position:center;filter:blur(24px) brightness(.5) saturate(1.1);pointer-events:none}
+body:is(.touch,.full).ingame #cv{box-shadow:0 0 40px rgba(0,0,0,.7)}
 #fsgate{position:fixed;inset:0;z-index:61;background:rgba(5,6,15,.88);display:flex;align-items:center;justify-content:center;touch-action:none}
 #fsgate[hidden]{display:none}
 #fsgate .box{text-align:center;color:#f5e7c0;font:600 22px "Alegreya",serif}
@@ -211,6 +214,7 @@ body.full:not(.touch).fight #combatui #keys,body.full:not(.touch).fight #combatu
 <div id="app">
   <header><h1>Kuuritari</h1><div id="dayinfo"></div><button id="btnFs">Koko näyttö</button></header>
   <div id="stage">
+    <div id="bgfill" aria-hidden="true"></div>
     <canvas id="cv" width="1280" height="800"></canvas>
     <div id="toast"></div>
     <div id="modal" class="hidden"></div>
@@ -1208,7 +1212,13 @@ function ask(title,html,buttons){return new Promise(res=>{
 let toastT=null;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2400);}
 function log(msg){if(!G)return;G.log.unshift(msg);G.log.length=Math.min(G.log.length,7);$('#log').innerHTML=G.log.map(l=>`<div>${l}</div>`).join('');}
-function setMode(m){mode=m;document.body.classList.toggle('fight',m==='combat');}
+function setMode(m){mode=m;document.body.classList.toggle('fight',m==='combat');stageFill(m==='combat'&&C?C.bg:MAPBG);}
+/* The window is rarely exactly 16:10: the space around the picture shows the same picture, blurred and dimmed
+   (current fight background, or the map), instead of empty bars. */
+const FILLCACHE=new WeakMap();
+function stageFill(src){const el=$('#bgfill');if(!el||!src)return;let u=FILLCACHE.get(src);
+ if(!u){try{const c=mk(192,120);c.getContext('2d').drawImage(src,0,0,192,120);u=c.toDataURL('image/jpeg',.82);FILLCACHE.set(src,u);}catch(_){return;}}
+ el.style.backgroundImage=`url("${u}")`;}
 function nodeDesc(n){let s=`${n.name}: `;
  if(n.type==='castle')s+=`${COLS[n.owner].gen} linna. Omassa linnassa ritari paranee täysiin voimiin.`;
  else if(n.type==='town')s+='kauppakylä, jossa on majoitus, juomia, aseita, haarniskoja ja koulutusta.';
@@ -1891,7 +1901,7 @@ function loop(now){if(FSGATE){last=now;requestAnimationFrame(loop);return;}const
  if(mode==='combat'&&C){updateCombat(dt);if(C)drawCombat();else drawMap();}
  else{if(G&&G.anim){G.anim.t+=dt;if(G.anim.t>=G.anim.dur){const a=G.anim;G.anim=null;a.res();}}camUpdate(dt);drawMap();if(DICE)drawDice(dt);}
  requestAnimationFrame(loop);}
-function startGame(){document.body.classList.add('ingame','full');setup();requestAnimationFrame(loop);setTimeout(prefetchAll,500);}
+function startGame(){document.body.classList.add('ingame','full');setup();stageFill(MAPBG);requestAnimationFrame(loop);setTimeout(prefetchAll,500);}
 const fontReady=Promise.race([document.fonts?Promise.all([document.fonts.load(`600 12px "Grenze Gotisch"`),document.fonts.load(`700 12px "Alegreya"`),document.fonts.load(`600 12px "Pixelify Sans"`)]):Promise.resolve(),sleep(2000)]);
 /* ---------- TITLE SCREEN ----------
    1) on phones/tablets held upright a "turn the device" prompt covers everything (CSS),
