@@ -875,10 +875,10 @@ function tintPhase(g,ter,p){const inside=ter==='cave'||ter==='crypt';
   if(!inside){const gr=g.createLinearGradient(0,0,0,H);gr.addColorStop(0,'rgba(80,40,90,.30)');gr.addColorStop(.6,'rgba(255,120,60,.06)');gr.addColorStop(1,'rgba(30,10,30,.25)');g.fillStyle=gr;g.fillRect(0,0,W,H);}}
  else if(p==='yo'){g.fillStyle='rgba(12,16,50,.5)';g.fillRect(0,0,W,H);}}
 /* Colour grading for fighters (always applied outside daytime, also with own phase art). */
-const FIGHTER_TINT={aamu:'rgba(255,170,110,.12)',ilta:'rgba(255,105,50,.20)',yo:'rgba(14,22,66,.45)'};
+const FIGHTER_TINT={};/* fighters are no longer tinted by time of day */
 function buildBg(ter,phase){if(phase===true)phase='yo';if(!phase||phase===false)phase='paiva';
  const k=bgKey(ter),[c,g]=mkL(W,H,S);seed(hashStr(ter)+3);const own=pickBgPhase(k,phase);
- if(own)g.drawImage(own,0,0,W,H);else{g.drawImage(pickBg(k)||buildBgProc(k),0,0,W,H);tintPhase(g,ter,phase);}
+ if(own)g.drawImage(own,0,0,W,H);else g.drawImage(pickBg(k)||buildBgProc(k),0,0,W,H);/* no colour tint: own phase art (e.g. metsa-yo.jpg) is still used when it exists */
  return c;}
 function buildBgProc(ter){const owner=/^castle[0-3]$/.test(ter)?+ter[6]:null;if(owner!=null)ter='castle';const[c,g]=mkL(W,H,S);seed(hashStr(ter));const P=[],add=(y,f)=>P.push({y,f});
  switch(ter){
@@ -1447,16 +1447,24 @@ function miniBossSpr(name){const key='bs'+name;if(MINI[key])return MINI[key];con
  const r=clamp(Math.min(L,R)*1.15+1.5,5.5,8),q=.34,bt=2.4*q,padX=Math.max(L,R,r)+1,cw=Math.ceil(padX*2*MRES),top=U+1,bot=r*.3+bt+1,ch=Math.ceil((top+bot)*MRES);
  const frames=fr.map(([sx,sy,w,h,ax,ay],i)=>{const c=mk(cw,ch),g=c.getContext('2d');g.setTransform(MRES,0,0,MRES,padX*MRES,top*MRES);
   g.save();g.scale(q,q);drawBase(g,r/q,1234+name.length*97,'#5a4a34');g.restore();
-  g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';g.drawImage(IMG,sx,sy,w,h,-ax*k,-ay*k-bt,w*k,h*k);return c;});
- return MINI[key]={frames,w:cw/MRES,h:ch/MRES,ox:padX,oy:top,r,ph:(name.length*.37)%1};}
+  g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';g.drawImage(IMG,sx,sy,w,h,-ax*k,-ay*k-bt,w*k,h*k);return c;}).map(c=>haloize(c,MINI_OUTLINE*MRES));
+ const hp=frames[0].pad/MRES;return MINI[key]={frames:frames.map(f=>f.c),w:cw/MRES+2*hp,h:ch/MRES+2*hp,ox:padX+hp,oy:top+hp,r,ph:(name.length*.37)%1};}
 function drawMiniBoss(name,x,y){const m=miniBossSpr(name);if(!m){drawMini(miniBoss(name),x,y,false);return;}
  ctx.save();ctx.translate(x,y);ctx.scale(1,.34);const r=m.r,gr=ctx.createRadialGradient(r*.3,1,0,r*.3,1,r*1.5);gr.addColorStop(0,'rgba(0,0,0,.55)');gr.addColorStop(1,'rgba(0,0,0,0)');
  ctx.fillStyle=gr;ctx.beginPath();ctx.arc(r*.3,1,r*1.5,0,TAU);ctx.fill();ctx.restore();
  const c=m.frames[0];ctx.drawImage(c,x-m.ox,y-m.oy,m.w,m.h);}
-function mini(key,make,s){if(!MINI[key]){const f=make();f.at=1;MINI[key]={c:renderFig(f,s),s,r:f.baseR};}return MINI[key];}
+/* Map figures stand out from the painted map: a thin dark outline around the whole miniature (base included)
+   and a soft shadow falling down-right, away from the light. Baked once per figure. px = outline width in source pixels. */
+function haloize(src,px){const pad=Math.ceil(px*7),c=mk(src.width+2*pad,src.height+2*pad),g=c.getContext('2d');
+ const sil=mk(src.width,src.height),sg=sil.getContext('2d');sg.drawImage(src,0,0);sg.globalCompositeOperation='source-in';sg.fillStyle='#0d0805';sg.fillRect(0,0,sil.width,sil.height);
+ g.save();g.shadowColor='rgba(0,0,0,.75)';g.shadowBlur=px*4.5;g.shadowOffsetX=px*2.4;g.shadowOffsetY=px*3;g.globalAlpha=.85;g.drawImage(sil,pad,pad);g.restore();
+ g.globalAlpha=.7;for(let a=0;a<8;a++)g.drawImage(sil,pad+Math.round(Math.cos(a*TAU/8)*px),pad+Math.round(Math.sin(a*TAU/8)*px));
+ g.globalAlpha=1;g.drawImage(src,pad,pad);return{c,pad};}
+const MINI_OUTLINE=.32; /* outline width in map units */
+function mini(key,make,s){if(!MINI[key]){const f=make();f.at=1;const c=renderFig(f,s),k=120*s/c.width,h=haloize(c,MINI_OUTLINE/k);MINI[key]={c,h,k,s,r:f.baseR};}return MINI[key];}
 function drawMini(m,x,y,active){const s=m.s,r=m.r*s;ctx.save();ctx.translate(x,y);ctx.scale(1,.34);const gr=ctx.createRadialGradient(r*.3,1,0,r*.3,1,r*1.5);gr.addColorStop(0,'rgba(0,0,0,.55)');gr.addColorStop(1,'rgba(0,0,0,0)');
  ctx.fillStyle=gr;ctx.beginPath();ctx.arc(r*.3,1,r*1.5,0,TAU);ctx.fill();if(active){const p=.5+.5*Math.sin(T*4);ctx.beginPath();ctx.arc(0,-2.4*s/.34,r+1.3+p*.7,0,TAU);ctx.strokeStyle=`rgba(255,215,110,${.55+p*.4})`;ctx.lineWidth=.6;ctx.stroke();}ctx.restore();
- ctx.drawImage(m.c,x-60*s,y-85*s,120*s,93*s);}
+ const h=m.h,k=m.k;ctx.drawImage(h.c,x-60*s-h.pad*k,y-85*s-h.pad*k,h.c.width*k,h.c.height*k);}
 function markerPos(p){if(G.anim&&G.anim.p===p){const k=Math.min(1,G.anim.t/G.anim.dur),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2,pt=edgePt(G.anim.from,G.anim.to,e);return[pt[0],pt[1]+7];}
  const n=NODES[p.node],grp=G.players.filter(q=>q.alive&&q.node===p.node&&!(G.anim&&G.anim.p===q)),i=grp.indexOf(p),off=(i-(grp.length-1)/2)*7.5;return[n.x+off,n.y+7+(i%2)*1.2];}
 function drawMap(){if(camOn()){const z=CAM.z;ctx.setTransform(S*z,0,0,S*z,S*(W/2-CAM.x*z),S*(H/2-CAM.y*z));}else ctx.setTransform(S,0,0,S,0,0);ctx.drawImage(MAPBG,0,0,W,H);
@@ -1473,7 +1481,7 @@ function drawMap(){if(camOn()){const z=CAM.z;ctx.setTransform(S*z,0,0,S*z,S*(W/2
  const lab=camOn()?null:hover!=null?hover:pinned;if(lab!=null){const n=NODES[lab];ctx.font=`700 6px ${FB}`;const tw=ctx.measureText(n.name).width,lx=clamp(n.x,tw/2+6,W-tw/2-6),ly=n.y>40?n.y-30:n.y+22;
   rrect(ctx,lx-tw/2-4,ly-4.6,tw+8,9.2,1.6);ctx.fillStyle='rgba(22,18,12,.88)';ctx.fill();ctx.strokeStyle='rgba(201,162,74,.85)';ctx.lineWidth=.35;ctx.stroke();txt(n.name,lx,ly+.2,'#f0e7d4','center',6);}
  {const t=dayProgress(),am=Math.max(0,1-t/.4),ev=Math.max(0,(t-.6)/.4);if(am>0){ctx.fillStyle=`rgba(255,180,120,${.11*am})`;ctx.fillRect(0,0,W,H);}if(ev>0){ctx.fillStyle=`rgba(255,110,60,${.16*ev})`;ctx.fillRect(0,0,W,H);ctx.fillStyle=`rgba(60,30,80,${.08*ev})`;ctx.fillRect(0,0,W,H);}}
- if(G.nightA>0){ctx.fillStyle=`rgba(8,12,40,${G.nightA})`;ctx.fillRect(0,0,W,H);}}
+ /* no time-of-day tint on the map (G.nightA still drives timeOfDay) */}
 
 /* ---------- GAME FLOW ---------- */
 const kStats=p=>({hp:p.hp,dmg:9+5*p.weapon,armorRed:ARMOR_RED[p.armor]});
@@ -1484,7 +1492,7 @@ function simFight(a,list){let hp=a.hp;
   if(hp<=0)return{result:'lose',hp:0};}
  return{result:'win',hp};}
 function winRate(a,list,n=30){let w=0;for(let i=0;i<n;i++)if(simFight(a,list).result==='win')w++;return w/n;}
-function animateMove(p,from,to){return new Promise(res=>{G.anim={p,from,to,t:0,dur:p.human?.5:.4,res};});}
+function animateMove(p,from,to){return new Promise(res=>{G.anim={p,from,to,t:0,dur:p.human?1:.8,res};});}
 function newGame(n){pinned=null;hover=null;
  G={day:1,cur:0,moves:0,rolled:0,keysAt:{5:true,6:true,7:true,8:true},busy:true,over:false,endTurn:false,stop:false,nightA:0,anim:null,humans:n,log:[],
   players:COLS.map((c,i)=>({idx:i,name:c.name,gen:c.gen,col:c,human:i<n,node:i,home:i,prev:null,hp:100,maxHp:100,gold:30,potions:1,weapon:0,armor:0,keys:[],lives:3,alive:true,grind:null}))};
@@ -1633,7 +1641,7 @@ async function aiTurn(p){await sleep(350);let guard=0;
   await stepTo(p,path[1]);await sleep(180);}}
 
 /* ---------- INPUT ---------- */
-addEventListener('keydown',e=>{if(DICE&&!e.repeat&&(e.code==='Space'||e.code==='Enter'||e.code==='NumpadEnter'||e.code==='Escape')){e.preventDefault();diceTap();return;}if(mode==='combat')e.preventDefault();if(!down.has(e.code))pressed.add(e.code);down.add(e.code);});
+addEventListener('keydown',e=>{if(DICE&&!e.repeat&&!/^(Shift|Control|Alt|Meta|Tab|CapsLock|F\d+)/.test(e.key)&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();diceTap();return;}if(mode==='combat')e.preventDefault();if(!down.has(e.code))pressed.add(e.code);down.add(e.code);});
 addEventListener('keyup',e=>down.delete(e.code));
 addEventListener('blur',()=>down.clear());
 let touchMode=false;
@@ -1661,7 +1669,7 @@ function nodeAt(e){const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.w
  for(const n of NODES){const d=Math.hypot(n.x-x,n.y-y);if(d<bd){bd=d;best=n.id;}}return best;}
 cv.addEventListener('pointermove',e=>{if(mode!=='map'||!G||e.pointerType==='touch')return;const h=nodeAt(e);if(h!==hover){hover=h;renderHUD();}});
 cv.addEventListener('pointerleave',()=>{hover=null;if(G)renderHUD();});
-cv.addEventListener('pointerdown',e=>{if(DICE){diceTap();return;}if(e.pointerType==='touch'&&camOn())return;if(mode!=='map'||!G||G.over||modalOpen())return;const n=nodeAt(e);if(n==null)return;const p=cur();
+cv.addEventListener('pointerdown',e=>{if(DICE)return;if(e.pointerType==='touch'&&camOn())return;if(mode!=='map'||!G||G.over||modalOpen())return;const n=nodeAt(e);if(n==null)return;const p=cur();
  if(p.human&&!G.busy&&G.moves>0){const d=bfs(p.node).d[n];if(d>=1&&d<=G.moves){humanMove(n);return;}}pinned=n;renderHUD();});
 $('#btnEnd').onclick=()=>{if(G&&!G.busy&&cur().human)endTurn();};
 $('#btnPot').onclick=()=>{const p=cur();if(!G.busy&&p.potions>0){p.potions--;p.hp=Math.min(p.maxHp,p.hp+40);log(`${p.name} joi parantavan juoman.`);renderHUD();}};
@@ -1810,10 +1818,12 @@ function d4Final(top){let R=alignRot(D4V[top],[0,1,0]);
 function startDice(p,roll){return new Promise(res=>{const vals=[1,2,3,4].sort(()=>Math.random()-.5),top=vals.indexOf(roll);
  DICE={p,roll,vals,t:0,res,closing:0,R:d4Final(top),axis:v3.norm([Math.random()-.5,Math.random()-.5,Math.random()-.5]),spin:9+Math.random()*5,
   x0:-260+Math.random()*120,z0:-120-Math.random()*80,yaw0:Math.random()*TAU};if(!WOODTEX&&!UI.noppapoyta)WOODTEX=woodTexture(1120,680);});}
-const DICE_LAND=1.25,DICE_TXT=1.45,DICE_AUTO=3.4;
+const DICE_LAND=1.25,DICE_TXT=1.45;
+/* any tap or click anywhere on the page (also outside the picture) continues from the roll */
+addEventListener('pointerdown',e=>{if(DICE&&!FSGATE&&!(e.target.closest&&e.target.closest('#fsgate'))){e.preventDefault();diceTap();}},true);
 function diceTap(){if(!DICE)return;if(DICE.t<DICE_TXT)DICE.t=DICE_TXT;else if(!DICE.closing)DICE.closing=1e-3;}
 function diceHeight(t){const f=.62;if(t<f)return 520*(1-(t/f)**2);if(t<.98){const u=(t-f)/(.98-f);return 70*4*u*(1-u);}if(t<DICE_LAND){const u=(t-.98)/(DICE_LAND-.98);return 16*4*u*(1-u);}return 0;}
-function drawDice(dt){const D=DICE;D.t+=dt;if(D.closing){D.closing+=dt;if(D.closing>.28){DICE=null;D.res();return;}}else if(D.t>DICE_AUTO)D.closing=1e-3;
+function drawDice(dt){const D=DICE;D.t+=dt;if(D.closing){D.closing+=dt;if(D.closing>.28){DICE=null;D.res();return;}}/* no auto-close: the roll stays until the player taps, clicks or presses a key/button */
  const g=ctx;g.save();g.setTransform(1,0,0,1,0,0);const Wc=cv.width,Hc=cv.height,sx=Wc/1280,sy=Hc/800;g.scale(sx,sy);
  const open=Math.min(1,D.t/.25),fade=D.closing?Math.max(0,1-D.closing/.28):1,ease=1-(1-open)**3;
  g.globalAlpha=fade;g.fillStyle=`rgba(5,4,10,${(UI.noppapoyta?.58:.72)*ease})`;g.fillRect(0,0,1280,800);
@@ -1883,7 +1893,7 @@ function drawDice(dt){const D=DICE;D.t+=dt;if(D.closing){D.closing+=dt;if(D.clos
  if(D.t>=DICE_TXT){const a=Math.min(1,(D.t-DICE_TXT)/.25),pop=1+.25*(1-a)*(1-a);g.save();g.globalAlpha*=a;g.translate(640,215);g.scale(pop,pop);
   const msg=D.roll===1?'Sait 1 siirron':`Sait ${D.roll} siirtoa`;g.font='700 86px "Grenze Gotisch","Alegreya",serif';g.lineWidth=10;g.strokeStyle='rgba(10,6,2,.85)';g.strokeText(msg,0,0);
   const tg=g.createLinearGradient(0,-40,0,40);tg.addColorStop(0,'#fff1bf');tg.addColorStop(.55,'#f0c858');tg.addColorStop(1,'#b8862c');g.fillStyle=tg;g.fillText(msg,0,0);g.restore();
-  g.globalAlpha=fade*a*.85;g.font='500 22px "Alegreya",serif';g.fillStyle='#e8dcc0';g.fillText(touchMode?'Napauta jatkaaksesi':padMode?'Paina ✕ / A jatkaaksesi':'Klikkaa tai paina välilyöntiä jatkaaksesi',640,700);}
+  g.globalAlpha=fade*a*(.6+.3*Math.sin(D.t*3.2));g.font='500 22px "Alegreya",serif';g.fillStyle='#e8dcc0';g.fillText(touchMode?'Kosketa näyttöä jatkaaksesi':padMode?'Paina ✕ / A jatkaaksesi':'Klikkaa tai paina mitä tahansa näppäintä jatkaaksesi',640,700);}
  g.restore();
  if(!UI.noppapoyta){g.globalAlpha=fade*ease;g.strokeStyle='#c9a24a';g.lineWidth=4;const fx=640-PW*sc/2,fy=400-PH*sc/2;g.strokeRect(fx,fy,PW*sc,PH*sc);g.strokeStyle='rgba(0,0,0,.8)';g.lineWidth=1.5;g.strokeRect(fx-3,fy-3,PW*sc+6,PH*sc+6);}
  g.restore();}
