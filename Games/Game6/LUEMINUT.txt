@@ -1,0 +1,125 @@
+KUURITARI – kotisivuversio
+=====================
+
+Kansiorakenne (säilytä sellaisenaan):
+
+kuuritari/
+  index.html            pelin koodi ja sivu
+  assets/
+    aloitus.jpg         aloituskuva
+    nappi-aloita.png    aloitusnapin grafiikka
+    nappi-aloita-hover.png  aloitusnappi korostettuna
+    kartta.jpg          karttanäkymän tausta
+    sprites/            hahmojen spritearkit (.png) ja animaatiotiedot (.json)
+      ritari, rotta, susi, hiisi, kalmo, lisko, luuranko, peikko, peikkokuningas,
+      siipilisko, luukuningas, liskokuningas, vartija
+    taustat/            taistelutaustat
+      metsa, suo, ylanko, nummi, luola, krypta, kivikeha, linna, kyla,
+      punalinna, sinilinna, viherlinna, kultalinna
+      mukana myös variaatiot: metsa-2..4, metsa-aamu(-2), metsa-ilta(-2), metsa-yo(-2),
+      kivikeha-aamu, kivikeha-ilta, kivikeha-yo, krypta-2,
+      kultalinna-aamu, kultalinna-ilta, kultalinna-yo, kyla-aamu, kyla-ilta, kyla-yo, luola-2,
+      nummi-2, nummi-aamu(-2), nummi-ilta(-2), nummi-yo(-2),
+      punalinna-aamu, punalinna-ilta, punalinna-yo, sinilinna-aamu, sinilinna-ilta, sinilinna-yo,
+      suo-2, suo-aamu, suo-ilta, suo-yo, viherlinna-aamu, viherlinna-ilta, viherlinna-yo,
+      ylanko-aamu(-2), ylanko-ilta(-2)
+
+Asennus:
+1. Kopioi koko kuuritari-kansio palvelimellesi, esim. pelisivusi juureen.
+   Peli löytyy silloin osoitteesta https://oma-sivu.fi/kuuritari/
+2. Älä muuta assets-kansion nimeä tai paikkaa suhteessa index.html:ään.
+   (Polku on index.html:ssä: const ASSET_DIR='assets/')
+
+Testaus omalla koneella:
+Peli toimii myös avaamalla index.html suoraan levyltä (tuplaklikkaus). Silloin peli käyttää
+sisäänrakennettuja animaatiotietoja ja valmiiksi värjättyjä ritarikuvia (ritari-0..3.png).
+Jos olet muuttanut .json-tiedostoja tai ritari.png:tä, testaa paikallisen palvelimen kautta:
+    python -m http.server 8000
+ja avaa selaimessa http://localhost:8000/
+
+Kuvien vaihtaminen:
+- Uusi taistelutausta: korvaa esim. assets/taustat/metsa.jpg samannimisellä
+  1280 x 800 -kuvalla.
+- Uusi kartta: korvaa assets/kartta.jpg (1280 x 800). Paikkojen koordinaatit
+  ovat index.html:ssä (NODES).
+- Uusi spritearkki: korvaa .png ja .json -pari.
+- Kun vaihdat kuvia, kasvata index.html:ssä ASSET_V-numeroa (esim. '1' -> '2'),
+  jotta pelaajien selaimet hakevat uudet versiot välimuistin sijaan.
+
+Useita taustoja samalle maastolle:
+- Peli arpoo jokaiseen taisteluun yhden maaston taustoista.
+- Ensimmäinen tausta on aina ilman numeroa, lisätaustat numeroidaan 2:sta alkaen:
+      assets/taustat/metsa.jpg
+      assets/taustat/metsa-2.jpg
+      assets/taustat/metsa-3.jpg
+- Numeroissa ei saa olla aukkoja (jos metsa-3.jpg puuttuu, metsa-4.jpg jää käyttämättä).
+- Enintään 9 taustaa maastoa kohden. Sama tausta ei tule kahdesti peräkkäin.
+- Sama toimii kaikille maastoille: suo, ylanko, nummi, luola, krypta, kivikeha, linna, kyla.
+- Kuvat 1280 x 800, JPEG (.jpg) tai PNG (.png). Muotoja voi sekoittaa.
+  Jos samalla nimellä on sekä .png että .jpg, peli käyttää PNG:tä.
+- Muista kasvattaa ASSET_V-numeroa index.html:ssä.
+
+Linnojen omat taustat:
+- Jokaisella linnalla on omat taustansa (kaksintaistelut linnoissa):
+      punalinna.jpg, sinilinna.jpg, viherlinna.jpg, kultalinna.jpg
+  ja niiden lisäversiot samaan tapaan: kultalinna-2.png, kultalinna-3.png ...
+- Jos linnalla ei ole omia taustoja, peli käyttää yleisiä linna*.jpg/png-taustoja.
+
+Vuorokaudenajat:
+- Jokaisella ritarilla on oma päivänsä, joka kuluu siirtojen mukana: vuoro alkaa aamulla,
+  ja aika etenee jokaisella siirrolla (4 siirtoa: aamu, päivä, päivä, ilta; 3: aamu, päivä,
+  ilta; 2: aamu, ilta; 1: päivä). Yölliset väijytykset päivien välissä ovat yötä.
+- Taustoille voi tehdä omat versiot vuorokaudenajoittain:
+      metsa.png        (päivä)
+      metsa-aamu.png   (aamu)
+      metsa-ilta.png   (ilta)
+      metsa-yo.png     (yö)
+  ja niille lisäversiot: metsa-ilta-2.png, metsa-ilta-3.png ...
+- Jos jonkin ajan kuva puuttuu, peli sävyttää päivätaustan automaattisesti
+  (aamu lämpimäksi, ilta oranssinvioletiksi, yö tummansiniseksi). Kuviin ei lisätä mitään,
+  ainoastaan värisävy muuttuu. Jos ajalle on oma kuva, sitä ei sävytetä lainkaan.
+- Ritarit ja hirviöt sävytetään aina vuorokaudenajan mukaan (aamu, ilta, yö).
+- Sama toimii kaikille maastoille ja linnoille (esim. kultalinna-ilta.png).
+
+Peliohjain:
+- Xbox- ja PlayStation-ohjaimet toimivat (langallinen tai Bluetooth). Paina mitä tahansa
+  ohjaimen nappia, niin peli tunnistaa sen. Vaatii https-osoitteen.
+- Taistelu: tikku/ristiohjain liiku, O/B isku, kolmio/Y yläisku, X/A alaisku,
+  neliö/X tai R1/RB torju, L1/LB juoma.
+- Kartta: tikku/ristiohjain valitse paikka, X/A liiku, kolmio/Y paikan toiminto,
+  neliö/X juoma, Start lopeta vuoro. Ikkunoissa X/A valitse, O/B poistu.
+
+Aloituskuva:
+- assets/aloitus.jpg (tai aloitus.png, joka ohittaa jpg:n), 1280 x 800.
+- Aloita-nappi on kuvan alakeskellä: assets/nappi-aloita.png ja korostettu
+  nappi-aloita-hover.png (läpinäkyviä PNG:itä, molemmat täsmälleen samankokoisia,
+  nyt 737 x 208, jotta ne vaihtuvat toisiinsa ilman hyppäystä).
+  Ilman kuvaa käytetään tekstinappia. Nappi aktivoituu, kun peli on latautunut.
+  Käynnistys: klikkaus/napautus, Enter tai välilyönti, ohjaimen X/A tai Start.
+- Puhelimella ja tabletilla pystyasennossa peli pyytää kääntämään laitteen vaakaan.
+  Startin painallus avaa puhelimessa koko näytön ja lukitsee vaaka-asennon (jos laite sallii).
+
+Siirtonoppa:
+- Jokaisen vuoron alussa heitetään d4: siirtoja on 1–4. Ihmispelaajalle näytetään
+  nopanheitto lähikuvana puupöydällä; tekoälyn heitto näkyy lyhyenä ilmoituksena.
+
+Mobiilikartta:
+- Puhelimella ja tabletilla kartta täyttää ruudun ja näytetään lähikuvana, joka seuraa
+  vuorossa olevaa ritaria. Vedä sormella siirtääksesi, nipistä zoomataksesi, kaksoisnapauta
+  vaihtaaksesi koko kartan ja lähikuvan välillä. Napit: ☰ Tiedot (paikka, ritarit, loki),
+  ⤢ koko kartta / lähikuva, ◎ keskitä ritariin.
+- Paikan napautus avaa kortin; jos paikkaan ehtii, siirto vahvistetaan Liiku-napilla.
+- Terävämpi kartta zoomattuna: lisää assets/kartta-2x.jpg (2560 x 1600). Peli käyttää sitä
+  automaattisesti tavallisen kartta.jpg:n sijaan.
+
+Taistelun käyttöliittymä (omat grafiikat, kaikki vapaaehtoisia):
+- Kansio assets/ui/, PNG läpinäkyvällä taustalla. Paneeli on pelissä 336 x 56 px;
+  piirrä mieluiten kaksinkertaisena 672 x 112 px (alla mitat 1x-koossa).
+    hp-kehys.png         paneelin kehys/tausta (vasen paneeli; oikea peilataan)
+    hp-kehys-oikea.png   oma kehys oikealle paneelille (jos et halua peilausta)
+    hp-tausta.png        tyhjä palkki, 312 x 16 px
+    hp-tayte.png         täysi palkki, 312 x 16 px (leikataan elinvoiman mukaan)
+    hp-tayte-pomo.png    pomojen täysi palkki (muuten käytetään hp-tayte.png)
+    juoma.png            juomakuvake, noin 13 x 17 px
+- Kehyksessä palkin paikka: x 12–324, y 30–46 px; nimi tulee yläosaan (y 4–26 px).
+  Nimet ja elinvoimaluvut peli kirjoittaa itse.
