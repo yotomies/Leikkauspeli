@@ -365,12 +365,13 @@ const TRACKS = [
       { t: 'hill', at: 520, len: 60, h: 2.6 }, { t: 'cork', at: 870, len: 110, R: 6 }, { t: 'hill', at: 1115, len: 140, h: 5 },
       { t: 'mesa', at: 1480, up: 130, flat: 60, down: 250, h: 22 }, { t: 'jump', at: 1510, up: 35, gap: 20, down: 80, h: 3, minV: 30 },
       { t: 'vloop', at: 1775, R: 15 }, { t: 'roll', at: 2140, len: 120, h: 1.6, n: 3 }] },
-  { name: 'Korkea hyppy', key: 'korkeahyppy', stars: 3, base: 16,
-    desc: 'Pitkällä suoralla 68 metrin aukko: yli pääsee vain yli 200 km/h vauhdilla, joten säästä turboa. Kulmikas takasuora kannattaa ajaa noin 180 km/h, muu rata täysillä.',
+  { name: 'Pitkä nousu', key: 'korkeahyppy2', stars: 3, base: 16,
+    desc: 'Rata kiipeää kaarteiden kautta 185 metrin korkeuteen ja syöksyy sieltä lähes pystysuoraan alas. Pudotuksen tuomalla vauhdilla loikataan heti perään 68 metrin aukon yli – turbo varmistaa. Tule reunalle maltilla, muuten lennät jyrkänteeltä.',
     pts: pathPts(-450, -150, 0, [['S', 900], ['A', 150, 166.25], ['S', 465.8], ['A', 140, 27.5], ['S', 465.8], ['A', 150, 166.25]]),
-    feats: (L) => [
-      { t: 'jump', at: 560, up: 60, gap: 68, down: 150, h: 4, minV: 57 },
-      { t: 'hill', at: 1120, len: 300, h: 6 }, { t: 'hill', at: 2550, len: 300, h: -5 }] },
+    feats: (L) => { const D = [[40, -0.5], [100, -1.2], [67, -1.2], [45, 0]], g = wallGeom(D), TOP = 170; return [
+      { t: 'prof', smooth: true, pts: [[0, TOP], [20, TOP], [20 + g.adv, TOP + g.Y], [900, TOP + g.Y], [950, TOP + g.Y], [2334, TOP], [L - 30, TOP]] },
+      { t: 'wall', at: 20, segs: D, abs: true, aiV: 30 },
+      { t: 'jump', at: 300, up: 60, gap: 68, down: 150, h: 4, minV: 57 }]; } },
   { name: 'Kahdeksikko', cross: true, stars: 3, base: 10,
     desc: 'Silta, alikulku, hyppy juuri ennen alikulkua ja pystysilmukka sen jälkeen.',
     pts: lemniPts(380, 300, 20, 0.25),
@@ -1155,7 +1156,7 @@ let mountains = null; const mountainTone = [];
 (() => {
   const rnd = mulberry(7);
   const geo = new THREE.ConeGeometry(1, 1, 5); geo.translate(0, 0.5, 0);
-  const m = mountains = new THREE.InstancedMesh(geo, new THREE.MeshPhongMaterial({ flatShading: true, shininess: 0, specular: 0x000000 }), 46);
+  const m = mountains = new THREE.InstancedMesh(geo, new THREE.MeshPhongMaterial({ flatShading: true, shininess: 0, specular: 0x000000 }), 46); m.frustumCulled = false;
   const d = new THREE.Object3D(), c = new THREE.Color();
   for (let i = 0; i < 46; i++) {
     const a = i / 46 * Math.PI * 2 + rnd() * 0.1, r = 2300 + rnd() * 500, h = 140 + rnd() * 260;
@@ -1299,7 +1300,7 @@ function buildTrackMeshes(tr, seed) {
       for (const sg of [-1, 1]) { const o = sg * (HALF - 0.3); dd.position.set(sm.x + sm.lx * o, h + bankAt(tr, s) * o + 0.12, sm.z + sm.lz * o); dd.rotation.set(0, sm.hd, 0); dd.scale.set(0.22, 0.12, 0.5); dd.updateMatrix(); rm.push(dd.matrix.clone()); }
     }
     const refl = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffb020 }), rm.length);
-    rm.forEach((m, i) => refl.setMatrixAt(i, m)); trackGroup.add(refl);
+    rm.forEach((m, i) => refl.setMatrixAt(i, m)); refl.frustumCulled = false; trackGroup.add(refl);
   }
 
   // teräsristikko
@@ -1343,7 +1344,8 @@ function buildTrackMeshes(tr, seed) {
   });
   const steelMatAll = new THREE.MeshLambertMaterial({ color: 0x9aa0ab }), postM = new THREE.MeshLambertMaterial({ color: 0xff8800 });
   const steel = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), steelMatAll, mats.length);
-  mats.forEach((m, i) => steel.setMatrixAt(i, m)); trackGroup.add(steel);
+  // Huom: instanssoitujen kappaleiden rajaus perustuisi yhden laatikon kokoon maailman origossa -> pilarit katosivat, kun origo ei ollut kuvassa
+  mats.forEach((m, i) => steel.setMatrixAt(i, m)); steel.frustumCulled = false; trackGroup.add(steel);
 
   // korkkiruuvien tukirenkaat
   const hoopM = new THREE.MeshLambertMaterial({ color: 0xff8800 });
@@ -1351,8 +1353,11 @@ function buildTrackMeshes(tr, seed) {
     if (k.kind !== 'cork') continue;
     const ring = new THREE.TorusGeometry(Math.hypot(k.Rc, HALF) + 1.4, 0.35, 6, 28);
     for (let x = 0; x <= k.Lc + 0.1; x += k.Lc / 4) {
-      const hb = heightAt(tr, k.s0 - 1), sb = samp(tr, k.s0 - 1), hd = sb.hd, fwd = x;
-      const ax = sb.x + Math.sin(hd) * fwd, az = sb.z + Math.cos(hd) * fwd, ay = hb + k.Rc;
+      // rengas kierteen todellisen akselin kohdalle: akseli seuraa radan keskilinjaa, vaikka rata kaartuisi
+      const s = k.s0 + Math.min(k.Ls - 0.01, Math.max(0.01, x / k.Lc * k.Ls)), th = 2 * Math.PI * (s - k.s0) / k.Ls;
+      const sm = samp(tr, s), hd = sm.hd;
+      const ax = sm.x - sm.rx * k.Rc * Math.sin(th), az = sm.z - sm.rz * k.Rc * Math.sin(th);   // samp antaa kosketuspisteen; takaisin akselille
+      const ay = heightAt(tr, s) - k.Rc * (1 - Math.cos(th)) + k.Rc;
       const m = new THREE.Mesh(ring, hoopM); m.position.set(ax, ay, az); m.rotation.y = hd; trackGroup.add(m);
       const leg = new THREE.Mesh(new THREE.BoxGeometry(0.6, Math.max(0.2, ay - Math.hypot(k.Rc, HALF) - 1.4), 0.6), steelMatAll);
       leg.position.set(ax, (ay - Math.hypot(k.Rc, HALF) - 1.4) / 2, az); trackGroup.add(leg);
@@ -1424,7 +1429,7 @@ function buildTrackMeshes(tr, seed) {
   // puut
   const rnd = mulberry(seed * 97 + 13);
   const tg = new THREE.ConeGeometry(2.4, 8, 6); tg.translate(0, 4, 0);
-  const trees = new THREE.InstancedMesh(tg, new THREE.MeshPhongMaterial({ flatShading: true, shininess: 0, specular: 0x000000 }), 320);
+  const trees = new THREE.InstancedMesh(tg, new THREE.MeshPhongMaterial({ flatShading: true, shininess: 0, specular: 0x000000 }), 320); trees.frustumCulled = false;
   const c = new THREE.Color(); let placed = 0, tries = 0;
   while (placed < 320 && tries < 4000) {
     tries++;
@@ -1852,7 +1857,7 @@ $('camBtn').onclick = toggleCam; $('muteBtn').onclick = toggleMute; $('pauseBtn'
 const camPos = new V3(); let camInit = true, menuAng = 0;
 const tmpA = new V3(), tmpB = new V3(), tmpU = new V3();
 let camBlend = 0;
-const chaseLook = new V3(), chaseUp = new V3(0, 1, 0), ckPos = new V3(), ckLook = new V3(), ckUp = new V3(), tmpC = new V3(); let ckDip = 0, ckHide = 0, ckNeedAir = 0;
+const chaseLook = new V3(), chaseUp = new V3(0, 1, 0), ckPos = new V3(), ckLook = new V3(), ckUp = new V3(), tmpC = new V3(); let ckDip = 0, ckHide = 0, ckNeedAir = 0, ckAirRaise = 0;
 function updateCamera(dt) {
   const c = player, m = pMesh, drive = c.state === 'drive', special = c.inLoop || c.inCork || c.inWall;
   // ohjaamonäkymä <-> takanäkymä liukuvalla zoomauksella
@@ -1860,6 +1865,7 @@ function updateCamera(dt) {
   camBlend += clamp(tgt - camBlend, -dt * 2.2, dt * 2.2);
   const e = camBlend * camBlend * (3 - 2 * camBlend);
   const spd = clamp(Math.abs(c.v), 0, 70);
+  // näkökenttä leviää vauhdin mukana; ohjaamossa kamera liukuu samalla eteenpäin (ja supistuessa taaksepäin), jottei ratti karkaa kauemmas
   const fov = lerp(66 + spd * 0.16, 72 + spd * 0.2, e) + (c.boosting ? 5 : 0);
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
   m.root.updateMatrixWorld();
@@ -1906,16 +1912,21 @@ function updateCamera(dt) {
       if (!c.grounded) { ckNeedAir = need; need = 0; } // ilmassa katse pysyy auton suunnassa (inertia)
     }
     ckDip += (need - ckDip) * Math.min(1, dt * 8);
-    const raise = Math.min(1.8, ckDip * 4);
-    ckPos.set(0, 1.36 + c.susp + raise, -0.25).applyMatrix4(mw);
+    // ilmassa katse nousee hieman (suunta pysyy inertian mukaisena), jotta alastulopaikka näkyy ratin ja kojelaudan yli
+    ckAirRaise += ((c.grounded ? 0 : Math.min(0.45, ckNeedAir * 1.5)) - ckAirRaise) * Math.min(1, dt * 4);
+    const raise = Math.min(1.8, ckDip * 4) + ckAirRaise;
+    // dolly: kun näkökenttä on leveämpi kuin perusarvo 72°, kamera siirtyy eteenpäin noin 70 % siitä, mikä pitäisi ratin koon ennallaan
+    const dolly = clamp(0.7 * 0.67 * (1 - Math.tan(36 * Math.PI / 180) / Math.tan(camera.fov * Math.PI / 360)), -0.1, 0.24);
+    ckPos.set(0, 1.36 + c.susp + raise, -0.25 + dolly).applyMatrix4(mw);
     ckLook.set(0, 1.0 + c.susp + raise - Math.tan(ckDip) * 14.25, 14).applyMatrix4(mw);
     ckUp.set(0, 1, 0).applyQuaternion(m.root.quaternion);
   } else { ckDip = 0; ckNeedAir = 0; ckPos.copy(camPos); ckLook.copy(chaseLook); ckUp.copy(chaseUp); }
   // ohjaamossa piilotetaan takaosat (eivät koskaan peitä näkymää) ja kojelauta/ratti kun katse joudutaan laskemaan
   const inCk = camBlend > 0.04;
   m.rear.forEach(o => o.visible = !inCk);
-  ckHide = Math.max(ckDip, ckNeedAir > 0.05 ? 0.2 : 0);
-  m.interior.forEach(o => o.visible = !(inCk && ckHide > 0.1));
+  // ratti ja kojelauta pysyvät aina näkyvissä hypyissä; piilotus vain jos maassa katsetta joudutaan laskemaan todella paljon
+  ckHide = ckDip;
+  m.interior.forEach(o => o.visible = !(inCk && ckHide > 0.3));
   camera.position.lerpVectors(camPos, ckPos, e);
   tmpB.lerpVectors(chaseLook, ckLook, e);
   camera.up.lerpVectors(chaseUp, ckUp, e).normalize();
