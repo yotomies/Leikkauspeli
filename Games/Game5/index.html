@@ -191,6 +191,11 @@ body.touch #tc .lbl{font-size:10px}
 body.touch #crack{width:min(140px,24vw);height:12px;margin-top:2px}
 body.touch .cage canvas{height:12px}
 body.touch #hud.cockpit #tl,body.touch #hud.cockpit #tr{top:calc(24px + env(safe-area-inset-top,0px))}
+
+/* Ennätyslistat */
+.rtable{max-width:340px}
+.rtable td{padding:3px 6px}
+.tcard .rec{color:var(--wb-orange)}
 </style>
 </head>
 <body>
@@ -1596,6 +1601,24 @@ const curWidth = () => WIDTH[mode === 'champ' && champ ? champ.diff : diffIdx];
 const bestKey = i => 'taivasrata-paras-' + (TRACKS[i].key || i);
 function loadBest(i) { try { const v = localStorage.getItem(bestKey(i)); return v ? parseFloat(v) : null; } catch (e) { return null; } }
 function saveBest(i, t) { try { localStorage.setItem(bestKey(i), String(t)); } catch (e) {} }
+// ---- ennätykset vaikeustasoittain: 5 parasta kierrosta ja 5 parasta kokonaisaikaa ----
+const DIFF_NAMES = ['Helppo', 'Normaali', 'Vaikea'];
+const curDiff = () => (mode === 'champ' && champ ? champ.diff : diffIdx);
+const recKey = (i, d) => 'taivasrata-ennatys-' + (TRACKS[i].key || i) + '-' + d;
+function loadRec(i, d) {
+  let r = null; try { const v = localStorage.getItem(recKey(i, d)); r = v ? JSON.parse(v) : null; } catch (e) {}
+  if (!r) { r = { laps: [], totals: [] }; const old = d === 1 ? loadBest(i) : null; if (old) r.laps.push({ t: old, d: 0 }); } // vanha ennätys siirtyy normaaliin
+  return r;
+}
+function saveRec(i, d, r) { try { localStorage.setItem(recKey(i, d), JSON.stringify(r)); } catch (e) {} }
+function addRec(list, t, id) { list.push({ t, d: id }); list.sort((a, b) => a.t - b.t); const rank = list.findIndex(e => e.d === id); list.length = Math.min(list.length, 5); return rank < 5 ? rank : -1; }
+const fmtDelta = x => (x < 0 ? '−' : '+') + Math.abs(x).toFixed(1).replace('.', ',') + ' s';
+const fmtDate = id => { if (!id) return ''; const d = new Date(id); return d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear(); };
+function recListHTML(title, list, mine) {
+  if (!list.length) return '';
+  return '<h2 style="margin:14px 0 6px">' + title + '</h2><table class="ctable rtable"><tbody>' + list.map((e, k) =>
+    '<tr class="' + (mine.includes(e.d) ? 'me' : '') + '"><td>' + (k + 1) + '.</td><td><b>' + fmt(e.t) + '</b></td><td class="n">' + fmtDate(e.d) + '</td></tr>').join('') + '</tbody></table>';
+}
 const fmt = t => { if (t == null || !isFinite(t)) return '–'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
 
 function setupRace(idx) {
@@ -1986,11 +2009,16 @@ function checkLaps(c) {
     c.lap = n; const lt = raceTime - c.lapStart; c.lapStart = raceTime; c.lapTimes.push(lt);
     if (!c.isAI) {
       c.boost = Math.min(100, c.boost + 30);
-      const best = loadBest(trackIdx);
-      if (best == null || lt < best) { saveBest(trackIdx, lt); c.newRecord = true; }
-      if (n < track.laps) showMsg('Kierros ' + n + ': ' + fmt(lt) + (n === track.laps - 1 ? ' · viimeinen kierros' : ''), 'info');
+      const d = curDiff(), rec = loadRec(trackIdx, d), prev = rec.laps.length ? rec.laps[0].t : null, id = Date.now() + n;
+      const rank = addRec(rec.laps, lt, id); saveRec(trackIdx, d, rec);
+      c.recIds = c.recIds || []; if (rank >= 0) c.recIds.push(id);
+      if (rank === 0) c.newRecord = true;
+      // kierroksen päätteeksi ero ennätykseen
+      const txt = 'Kierros ' + n + ': ' + fmt(lt) + (prev != null ? ' · ' + fmtDelta(lt - prev) : '') + (rank === 0 ? ' · uusi ennätys!' : '') + (n === track.laps - 1 ? ' · viimeinen kierros' : '');
+      showMsg(txt, prev == null || lt < prev ? 'good' : 'bad');
     }
-    if (c.lap >= track.laps && !c.finished) { c.finished = true; c.finishTime = raceTime; finishOrder.push(c); if (c.isAI && !player.finished) showMsg((curOpp ? curOpp.name : 'Vastustaja') + ' tuli maaliin', 'bad'); }
+    if (c.lap >= track.laps && !c.finished) { c.finished = true; c.finishTime = raceTime; finishOrder.push(c);
+      if (!c.isAI && !c.wrecked) { const d = curDiff(), rec = loadRec(trackIdx, d), prev = rec.totals.length ? rec.totals[0].t : null, id = Date.now() + 99; const rank = addRec(rec.totals, raceTime, id); saveRec(trackIdx, d, rec); c.recIds = c.recIds || []; if (rank >= 0) c.recIds.push(id); c.totalRank = rank; c.totalPrev = prev; } if (c.isAI && !player.finished) showMsg((curOpp ? curOpp.name : 'Vastustaja') + ' tuli maaliin', 'bad'); }
   }
 }
 function stepRace(dt) {
@@ -2019,13 +2047,13 @@ function showResult() {
   if (mode === 'champ' && champ) { finishChampRace(); return; }
   const c = player, won = c.finished && finishOrder[0] === c;
   $('resTitle').textContent = c.wrecked ? 'Runko hajosi' : won ? 'Voitto' : 'Toinen sija';
-  const bl = c.lapTimes.length ? Math.min(...c.lapTimes) : null, rec = loadBest(trackIdx);
+  const bl = c.lapTimes.length ? Math.min(...c.lapTimes) : null, d = curDiff(), rec = loadRec(trackIdx, d), mine = c.recIds || [];
   $('resBody').innerHTML =
-    'Rata: <b>' + TRACKS[trackIdx].name + '</b><br>' +
-    (c.finished ? 'Kokonaisaika: <b>' + fmt(c.finishTime) + '</b><br>' : 'Kierroksia ajettu: <b>' + c.lap + '/' + track.laps + '</b><br>') +
-    'Paras kierros: <b>' + fmt(bl) + '</b>' + (c.newRecord ? ' – uusi ratatennätys' : '') + '<br>' +
-    'Rataennätys: <b>' + fmt(rec) + '</b><br>' +
-    'Vauriot: <b>' + Math.round(c.damage) + ' %</b> · putoamisia <b>' + c.falls + '</b>';
+    'Rata: <b>' + TRACKS[trackIdx].name + '</b> · ' + DIFF_NAMES[d] + '<br>' +
+    (c.finished ? 'Kokonaisaika: <b>' + fmt(c.finishTime) + '</b>' + (c.totalRank === 0 ? ' – uusi ennätys!' : c.totalPrev != null ? ' (' + fmtDelta(c.finishTime - c.totalPrev) + ')' : '') + '<br>' : 'Kierroksia ajettu: <b>' + c.lap + '/' + track.laps + '</b><br>') +
+    'Paras kierros: <b>' + fmt(bl) + '</b>' + (c.newRecord ? ' – uusi ennätys!' : '') + '<br>' +
+    'Vauriot: <b>' + Math.round(c.damage) + ' %</b> · putoamisia <b>' + c.falls + '</b>' +
+    recListHTML('Parhaat kierrokset (' + DIFF_NAMES[d] + ')', rec.laps, mine) + recListHTML('Parhaat kokonaisajat (' + DIFF_NAMES[d] + ')', rec.totals, mine);
   $('result').classList.remove('hidden'); $('againBtn').focus();
 }
 function startRace() {
@@ -2050,7 +2078,7 @@ function startRace() {
   }
 }
 function toMenu() {
-  gameState = 'menu'; setupRace(trackIdx); refreshMenu();
+  gameState = 'menu'; setupRace(trackIdx); refreshMenu(); refreshCardRecords();
   $('champ').classList.add('hidden');
   $('hud').classList.add('hidden'); $('touch').classList.remove('on'); $('result').classList.add('hidden'); $('pause').classList.add('hidden'); $('menu').classList.remove('hidden');
 }
@@ -2169,6 +2197,11 @@ function showChampFinal() {
     [['Uusi sarja', () => { newChamp(set); showChampPre(); }, true], ['Valikkoon', () => { toMenu(); }]]);
   if (place === 1) { sfxThud(0.6); buzz([60, 40, 60, 40, 120]); }
 }
+// ratakorttien ennätykset valitulla vaikeustasolla
+function refreshCardRecords() {
+  const d = diffIdx;
+  document.querySelectorAll('.tcard .rec').forEach(el => { const r = loadRec(+el.dataset.i, d); el.textContent = DIFF_NAMES[d] + ': kierros ' + fmt(r.laps[0] && r.laps[0].t) + ' · kisa ' + fmt(r.totals[0] && r.totals[0].t); });
+}
 function refreshMenu() {
   const ml = $('modeList'); if (!ml) return;
   ml.querySelectorAll('.btn').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === mode));
@@ -2192,9 +2225,8 @@ function buildMenu() {
   TRACKS.forEach((t, i) => {
     const tr = getTrack(i);
     const b = document.createElement('button'); b.className = 'tcard'; b.dataset.set = t.set || 1; b.setAttribute('aria-pressed', i === trackIdx);
-    const best = loadBest(i);
     b.innerHTML = '<div class="nm"><span>' + (t.weather ? WEATHER[t.weather].icon + ' ' : '') + t.name + '</span><span class="st" aria-label="vaikeus ' + t.stars + '/3">' + '■'.repeat(t.stars) + '□'.repeat(3 - t.stars) + '</span></div>' +
-      '<canvas width="240" height="38" aria-hidden="true"></canvas><p>' + t.desc + '</p><div class="meta">' + Math.round(tr.L) + ' m · ' + tr.laps + ' kierrosta · ennätys ' + fmt(best) + '</div>';
+      '<canvas width="240" height="38" aria-hidden="true"></canvas><p>' + t.desc + '</p><div class="meta">' + Math.round(tr.L) + ' m · ' + tr.laps + ' kierrosta<br><span class="rec" data-i="' + i + '"></span></div>';
     const cv = b.querySelector('canvas'), x = cv.getContext('2d');
     let mn = 1e9, mx = -1e9; const hs = [];
     for (let k = 0; k <= 240; k++) { const h = heightAt(tr, k / 240 * tr.L); hs.push(tr.gap ? null : h); if (!tr.gap) { mn = Math.min(mn, h); mx = Math.max(mx, h); } }
@@ -2205,11 +2237,11 @@ function buildMenu() {
     b.onclick = () => { trackIdx = i; list.querySelectorAll('.tcard').forEach((e, j) => e.setAttribute('aria-pressed', j === i)); setupRace(i); };
     list.appendChild(b);
   });
-  showSeries(1); refreshMenu();
+  showSeries(1); refreshMenu(); refreshCardRecords();
   const dl = $('diffList');
   DIFFS.forEach((d, i) => {
     const b = document.createElement('button'); b.className = 'btn'; b.textContent = d.name + (WIDTH[i] > 1 ? ' · leveät radat' : ''); b.setAttribute('aria-pressed', i === diffIdx);
-    b.onclick = () => { diffIdx = i; dl.querySelectorAll('.btn').forEach((e, j) => e.setAttribute('aria-pressed', j === i)); if (gameState === 'menu') setupRace(trackIdx); };
+    b.onclick = () => { diffIdx = i; dl.querySelectorAll('.btn').forEach((e, j) => e.setAttribute('aria-pressed', j === i)); if (gameState === 'menu') setupRace(trackIdx); refreshCardRecords(); };
     dl.appendChild(b);
   });
 }
