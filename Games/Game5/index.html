@@ -2581,7 +2581,7 @@ function trophyTable(sets, onlyFilled) {
 }
 function saveTrophies(t) { try { localStorage.setItem(TKEY, JSON.stringify(t)); } catch (e) {} }
 const seriesTracks = set => set === 5 ? SET5_TRACKS.map(nm => TRACKS.findIndex(t => t.name === nm)).filter(i => i >= 0) : TRACKS.map((t, i) => ((t.set || 1) === set ? i : -1)).filter(i => i >= 0);
-const SERIES_NAMES = { 1: 'Sarja 1', 2: 'Sarja 2: uudet radat', 3: 'Sarja 3: villit radat', 4: 'Sarja 4: Muuttuva sää', 5: 'Sarja 5: Mestarien mestaruus' };
+const SERIES_NAMES = { 1: 'Sarja 1: Helpot radat', 2: 'Sarja 2: haastavat radat', 3: 'Sarja 3: villit radat', 4: 'Sarja 4: Muuttuva sää', 5: 'Sarja 5: Mestarien mestaruus' };
 function oppSkill(d) { return d.skill + DOFF[champ.diff] + (champ.set - 1) * 0.8; }
 function newChamp(set) {
   const tracks = seriesTracks(set), n = tracks.length, opp = [];
@@ -2928,7 +2928,7 @@ function buildMenu() {
   [['Yksittäinen kisa', 'single'], ['Mestaruussarja', 'champ']].forEach(([lb, m]) => { const b = document.createElement('button'); b.className = 'btn'; b.dataset.mode = m; b.textContent = lb; b.onclick = () => { mode = m; refreshMenu(); }; mlist.appendChild(b); });
   const list = $('trackList'), ser = $('seriesList');
   const showSeries = showSeriesFn = n => { curSeries = n; refreshMenu(); list.querySelectorAll('.tcard').forEach(e => e.classList.toggle('hidden', +e.dataset.set !== n)); ser.querySelectorAll('.btn').forEach((e, j) => e.setAttribute('aria-pressed', j + 1 === n)); };
-  [['Sarja 1', 1], ['Sarja 2: uudet radat', 2], ['Sarja 3: villit radat', 3], ['Sarja 4: Muuttuva sää', 4], ['⭐ Sarja 5: Mestarien mestaruus', 5]].forEach(([lb, n]) => { const b = document.createElement('button'); b.className = 'btn'; b.dataset.n = n; b.dataset.label = lb; b.textContent = lb; b.onclick = () => showSeries(n); ser.appendChild(b); });
+  [['Sarja 1: Helpot radat', 1], ['Sarja 2: haastavat radat', 2], ['Sarja 3: villit radat', 3], ['Sarja 4: Muuttuva sää', 4], ['⭐ Sarja 5: Mestarien mestaruus', 5]].forEach(([lb, n]) => { const b = document.createElement('button'); b.className = 'btn'; b.dataset.n = n; b.dataset.label = lb; b.textContent = lb; b.onclick = () => showSeries(n); ser.appendChild(b); });
   const mk = (i, setNo) => {
     const t = TRACKS[i], tr = getTrack(i);
     const b = document.createElement('button'); b.className = 'tcard'; b.dataset.set = setNo; b.dataset.i = i; b.setAttribute('aria-pressed', i === trackIdx);
