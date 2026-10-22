@@ -443,8 +443,8 @@ window.__setBar = function (p) { var f = document.getElementById('lfill'); if (!
       </div>
       <div id="gfxOpts">
         <h2>Grafiikka</h2>
-        <div class="seg"><button class="btn" id="shadowBtn" aria-pressed="true">☀️ Auringon varjot: päällä</button></div>
-        <p class="sub" style="margin:8px 0 0">Aurinko ja oikeat varjot kirkkaan sään radoilla. Pois päältä peli toimii kevyemmin heikommilla laitteilla.</p>
+        <div class="seg"><button class="btn" id="shadowBtn" aria-pressed="true">☀️ Auringon varjot: päällä</button><button class="btn" id="shadowRangeBtn" aria-pressed="true">🗺️ Varjojen ulottuvuus: koko rata</button></div>
+        <p class="sub" style="margin:8px 0 0">Aurinko ja oikeat varjot kirkkaan sään radoilla. Koko rata: varjot näkyvät koko radalla kerralla, mutta ovat karkeampia. Lähialue: tarkemmat varjot auton ympärillä ja ohjaamossa. Pois päältä peli toimii kevyemmin heikommilla laitteilla.</p>
       </div>
       <div id="ctrlHelp">
         <h2>Ohjaus</h2>
@@ -1420,23 +1420,78 @@ const hemi = new THREE.HemisphereLight(0xdcecff, 0x4d6b3a, 0.85); scene.add(hemi
 const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(300, 600, 200); scene.add(sun); scene.add(sun.target);
 // ---------- Aurinko ja varjot (kirkkaan sään radoilla) ----------
 if (renderer.shadowMap) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
-const SUN = { on: false, dir: new THREE.Vector3(0.45, 0.75, 0.48).normalize(), ahead: 230, behind: 40, side: 65, pref: true, low: false }; // varjoalue: 230 m eteen, 40 m taakse, 65 m sivuille
-try { SUN.pref = localStorage.getItem('taivasrata-varjot') !== '0'; } catch (e) {}
+const SUN = { on: false, dir: new THREE.Vector3(0.45, 0.75, 0.48).normalize(), ahead: 230, behind: 40, side: 65, pref: true, low: false, prefMode: 'koko', mode: 'koko', fit: null, ppm: 0 }; // varjoalue: 230 m eteen, 40 m taakse, 65 m sivuille
+try { SUN.pref = localStorage.getItem('taivasrata-varjot') !== '0'; SUN.prefMode = localStorage.getItem('taivasrata-varjomatka') === 'lahi' ? 'lahi' : 'koko'; SUN.mode = SUN.prefMode; } catch (e) {}
 const isTouchDev = 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0;
 sun.shadow.mapSize.set(isTouchDev ? 2048 : 4096, isTouchDev ? 2048 : 4096);
-{ const sc = sun.shadow.camera; sc.left = -SUN.side; sc.right = SUN.side; sc.top = SUN.ahead; sc.bottom = -SUN.behind; sc.near = 1; sc.far = 700; sc.updateProjectionMatrix(); }
-sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.05;
+{ const sc = sun.shadow.camera; sc.left = -SUN.side; sc.right = SUN.side; sc.top = SUN.ahead; sc.bottom = -SUN.behind; sc.near = 60; sc.far = 520; sc.updateProjectionMatrix(); }
+sun.shadow.bias = -0.00012; sun.shadow.normalBias = 0.02; // pieni siirtymä: varjo pysyy kiinni renkaissa
 // aurinkokiekko taivaalla (piirretään aina kaukana kameran takaa nähtynä auringon suunnassa)
 const sunSprite = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
   const gr = x.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,245,1)'); gr.addColorStop(0.18, 'rgba(255,250,225,1)'); gr.addColorStop(0.32, 'rgba(255,236,180,0.55)'); gr.addColorStop(1, 'rgba(255,220,150,0)');
   x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), fog: false, depthWrite: false, transparent: true, toneMapped: false })); s.scale.set(260, 260, 1); s.visible = false; s.renderOrder = -1; scene.add(s); return s; })();
+// Kaksi varjokarttaa: 'sun' = tarkka kartta auton ympärillä (valaisee), 'sunFar' = karkea koko radan kartta (voimakkuus 0, vain varjo).
+// Varjot yhdistetään sävyttimessä: auringon valo kerrotaan molempien karttojen varjolla. Autot eivät ole karkeassa kartassa.
+const sunFar = new THREE.DirectionalLight(0xffffff, 0); sunFar.castShadow = false; scene.add(sunFar); scene.add(sunFar.target);
+sunFar.shadow.autoUpdate = false; sunFar.shadow.bias = -0.001; sunFar.shadow.normalBias = 0.25; // karkea kartta
+const DUAL_SHADOW_CHUNK = (() => { const c = THREE.ShaderChunk.lights_fragment_begin, i0 = c.indexOf('directionalLight = directionalLights[ i ];'), i1 = c.indexOf('RE_Direct( directLight, geometry, material, reflectedLight );', i0);
+  if (i0 < 0 || i1 < 0) return null;
+  return c.slice(0, i1) + `#if defined( USE_SHADOWMAP ) && ( UNROLLED_LOOP_INDEX == 0 ) && ( NUM_DIR_LIGHT_SHADOWS > 1 )
+		directLight.color *= receiveShadow ? getShadow( directionalShadowMap[ 1 ], directionalLightShadows[ 1 ].shadowMapSize, directionalLightShadows[ 1 ].shadowBias, directionalLightShadows[ 1 ].shadowRadius, vDirectionalShadowCoord[ 1 ] ) : 1.0;
+		#endif
+		` + c.slice(i1); })();
+const dualShadowPatch = sh => { if (DUAL_SHADOW_CHUNK) sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_begin>', DUAL_SHADOW_CHUNK); };
+const carCasters = [];
+function setCarCasting(on) { for (const o of carCasters) o.castShadow = on; }
 // radan oma auringon suunta: atsimuutti ja korkeus vaihtelevat radoittain (aamupäivästä matalaan iltaan)
 function setSunForTrack(i, weather) {
-  const a = ((i * 2.399) % (Math.PI * 2)), el = 0.45 + ((i * 0.37) % 0.5); // korkeus n. 26–54°
+  const a = ((i * 2.399) % (Math.PI * 2)), el = 0.82 + ((i * 0.37) % 0.33); // korkeus n. 47–66°: varjo pysyy auton alla
   SUN.dir.set(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)).normalize();
   SUN.on = weather === 'clear' && SUN.pref && !SUN.low;
-  sun.castShadow = SUN.on; sunSprite.visible = weather === 'clear';
+  sun.castShadow = SUN.on; sunFar.castShadow = SUN.on && SUN.mode === 'koko'; sunSprite.visible = weather === 'clear';
+}
+// Koko radan varjokartta: varjokameran laatikko sovitetaan tiukasti radan (ja sen maavarjojen) ympärille valon koordinaatistossa
+function fitSunToTrack(tr) {
+  const d = SUN.dir, up = Math.abs(d.y) > 0.98 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  const ex = new THREE.Vector3().crossVectors(up, d).normalize(), ey = new THREE.Vector3().crossVectors(d, ex);
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9, cx = 0, cz = 0, n = 0;
+  const add = (x, y, z) => { const a = x * ex.x + y * ex.y + z * ex.z, b = x * ey.x + y * ey.y + z * ey.z, c = x * d.x + y * d.y + z * d.z;
+    if (a < x0) x0 = a; if (a > x1) x1 = a; if (b < y0) y0 = b; if (b > y1) y1 = b; if (c < z0) z0 = c; if (c > z1) z1 = c; };
+  for (let s = 0; s < tr.L; s += 6) { const sm = samp(tr, s), h = heightAt(tr, s), g2 = sigOf(tr, s), ex2 = g2.loop ? 2 * (g2.loop.R || 15) : g2.cork ? 2 * (g2.cork.Rc || 8) : 0;
+    for (const o of [-HALF - 2, HALF + 2]) { const px = sm.x + sm.lx * o, pz = sm.z + sm.lz * o; add(px, h + ex2 + 3, pz); add(px, 0, pz); add(px, h, pz); } }
+  const m = 22; x0 -= m; x1 += m; y0 -= m; y1 += m;                       // reunamarginaali: autot, pilarit ja pudotukset radan viereen
+  const D = 900, W = x1 - x0, H = y1 - y0;
+  // varjokameran paikka ja kohde: laatikon keskipiste maailmassa
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, mz = (z0 + z1) / 2;
+  const c = new THREE.Vector3().addScaledVector(ex, mx).addScaledVector(ey, my).addScaledVector(d, mz);
+  const sc = sunFar.shadow.camera; sc.up.set(0, 1, 0);
+  sc.left = -W / 2; sc.right = W / 2; sc.top = H / 2; sc.bottom = -H / 2; sc.near = Math.max(1, D - (z1 - mz) - 30); sc.far = D + (mz - z0) + 30; sc.updateProjectionMatrix();
+  SUN.fit = { c, W, H, D };
+  // kartan mitat suhteutetaan laatikon sivuihin: pitkä sivu aina maksimitarkkuudella
+  const big = isTouchDev ? 2048 : 4096, pot = v => Math.min(big, Math.max(1024, Math.pow(2, Math.ceil(Math.log2(v)))));
+  const mw = W >= H ? big : pot(big * W / H), mh = H > W ? big : pot(big * H / W);
+  sunFar.shadow.mapSize.set(mw, mh); if (sunFar.shadow.map) { sunFar.shadow.map.dispose(); sunFar.shadow.map = null; }
+  SUN.ppm = Math.min(mw / W, mh / H);                                       // tarkkuus pikseliä per metri
+  return SUN.fit;
+}
+function applyShadowMode() {
+  const sc = sun.shadow.camera, koko = SUN.mode === 'koko';
+  // tarkka kartta: koko radan tilassa pieni alue auton ympärillä (autojen varjot), lähialuetilassa iso alue kuten ennen
+  const A = koko ? { side: 30, ahead: 70, behind: 20 } : { side: SUN.side, ahead: SUN.ahead, behind: SUN.behind };
+  sc.left = -A.side; sc.right = A.side; sc.top = A.ahead; sc.bottom = -A.behind; sc.near = 60; sc.far = 520; sc.updateProjectionMatrix(); // tiivis syvyysalue = tarkka vertailu
+  const s = koko ? (isTouchDev ? 1024 : 2048) : (isTouchDev ? 2048 : 4096);
+  if (sun.shadow.mapSize.x !== s) { sun.shadow.mapSize.set(s, s); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
+  sunFar.castShadow = koko && SUN.on;
+  if (sunFar.castShadow) { fitSunToTrack(track); sunFar.target.position.copy(SUN.fit.c); sunFar.position.copy(SUN.fit.c).addScaledVector(SUN.dir, SUN.fit.D);
+    sunFar.target.updateMatrixWorld(); sunFar.updateMatrixWorld(); SUN.farT = 0; }
+}
+// karkea kartta päivitetään harvoin (nostosillat liikkuvat): päivitysruudulla autot pois kartasta ja tarkka kartta pidetään edellisessä
+function farShadowTick(dt) {
+  if (SUN.farPending) { setCarCasting(true); sun.shadow.autoUpdate = true; SUN.farPending = false; }
+  if (!sunFar.castShadow) return;
+  SUN.farT = (SUN.farT || 0) - dt;
+  if (SUN.farT <= 0) { SUN.farT = track.bridges && track.bridges.length ? 0.5 : 1e9; setCarCasting(false); sunFar.shadow.needsUpdate = true; sun.shadow.autoUpdate = false; sun.shadow.needsUpdate = false; SUN.farPending = true; }
 }
 function updateSun() {
   const p = player && pMesh.root.visible ? pMesh.root.position : camera.position;
@@ -1605,11 +1660,11 @@ function buildTrackMeshes(tr, seed) {
     for (let k = 0; k < 3; k++) {
       if (k === 1 && (i < 3)) {
         const cells = 8, w = (offs[2] - offs[1]) / cells;
-        for (let q = 0; q < cells; q++) quad(pt(s0, offs[1] + q * w, 0), pt(s1, offs[1] + q * w, 0), pt(s1, offs[1] + (q + 1) * w, 0), pt(s0, offs[1] + (q + 1) * w, 0), (q + i) % 2 ? chkW : chkB);
+        for (let q = 0; q < cells; q++) quad(pt(s0, offs[1] + q * w, 0), pt(s0, offs[1] + (q + 1) * w, 0), pt(s1, offs[1] + (q + 1) * w, 0), pt(s1, offs[1] + q * w, 0), (q + i) % 2 ? chkW : chkB); // yläpinta: normaali ylös
         continue;
       }
       const col = k === 1 ? (stripe ? roadA : roadB) : (stripe ? kerbA : kerbB);
-      quad(pt(s0, offs[k], 0), pt(s1, offs[k], 0), pt(s1, offs[k + 1], 0), pt(s0, offs[k + 1], 0), col);
+      quad(pt(s0, offs[k], 0), pt(s0, offs[k + 1], 0), pt(s1, offs[k + 1], 0), pt(s1, offs[k], 0), col); // yläpinta: normaali ylös
     }
     quad(pt(s0, -HALF, 0), pt(s1, -HALF, 0), pt(s1, -HALF, -TH), pt(s0, -HALF, -TH), side);
     quad(pt(s0, HALF, 0), pt(s1, HALF, 0), pt(s1, HALF, -TH), pt(s0, HALF, -TH), side);
@@ -1942,7 +1997,8 @@ function buildCarEnv(w) {
   } catch (e) {}
 }
 // sävykartoitus koskee vain autojen materiaaleja: radat, maisema, taivas ja näytöt pysyvät ennallaan
-function applyToneFlags() { const cs = new Set(carMats); scene.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; ms.forEach(m => { const want = cs.has(m); if (m.toneMapped !== want) { m.toneMapped = want; m.needsUpdate = true; } }); }); }
+function applyToneFlags() { const cs = new Set(carMats); scene.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; ms.forEach(m => { const want = cs.has(m); if (m.toneMapped !== want) { m.toneMapped = want; m.needsUpdate = true; }
+  if ((m.isMeshPhongMaterial || m.isMeshStandardMaterial) && m.onBeforeCompile !== dualShadowPatch) { m.onBeforeCompile = dualShadowPatch; m.needsUpdate = true; } }); }); } // kahden varjokartan yhdistys
 const carStd = (c, rough, metal, envI = 1) => { const m = new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: metal, envMap: carEnvRT ? carEnvRT.texture : null, envMapIntensity: envI }); carMats.push(m); return m; };
 // pyöristetty laatikko: pyöristetty suorakulmio pursotettuna ja viistetty reunoista (valo taittuu reunoista kuten oikeassa korissa)
 function roundedBox(w, h, d, r) {
@@ -2211,14 +2267,16 @@ const aMeshes = [0, 1, 2, 3].map(st => makeCar(0x1f5fd6, 0xe9eef7, false, st));
 let aMesh = aMeshes[0];
 aMeshes.forEach((m, k) => { m.root.visible = k === 0; if (k) m.shadow.visible = false; });
 // autot heittävät ja vastaanottavat varjoja (valot, näytöt ja läpinäkyvät tarrat eivät heitä)
-[pMesh, ...aMeshes].forEach(m => m.root.traverse(o => { if (o.isMesh) { const basic = o.material.type === 'MeshBasicMaterial'; o.castShadow = !basic && !o.material.transparent; o.receiveShadow = !basic; } }));
+[pMesh, ...aMeshes].forEach(m => m.root.traverse(o => { if (o.isMesh) { const basic = o.material.type === 'MeshBasicMaterial'; o.castShadow = o.userData.caster = !basic && !o.material.transparent; o.receiveShadow = !basic; if (o.userData.caster) carCasters.push(o); } }));
 function setAiCar(st, col, acc, name, num) {
   const prev = aMesh; aMesh = aMeshes[st];
-  aMeshes.forEach(m => { const on = m === aMesh; m.root.visible = on; if (!on) m.shadow.visible = false; });
+  aMeshes.forEach(m => { const on = m === aMesh; m.root.visible = on; if (!on) { m.shadow.visible = false; } });
   aMesh.baseCol.setHex(col); aMesh.mBody.color.setHex(col); aMesh.mAcc.color.setHex(acc); aMesh.livery.draw(name || 'Haastaja', num || 99, col, acc);
   aMesh.head.intensity = prev.head.intensity; aMesh.head.visible = prev.head.visible;
 }
 const DIRT = new THREE.Color(0x3a352e);
+// auringon varjojen kanssa auton alle jää himmeä, tiivis kosketusvarjo (painaa auton rataan kiinni)
+function contactShadows() { for (const m of [pMesh, aMesh]) { if (!m.shadow.visible) continue; m.shadow.material.opacity *= 0.5; m.shadow.scale.set(0.82, 1, 0.86); } }
 const styleOf = nm => { let h = 0; for (const ch of nm) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 4; };
 
 function placeCar(c, m, dt) {
@@ -2267,7 +2325,7 @@ function placeCar(c, m, dt) {
     m.shadow.visible = rel > -0.5 && rel < 40 && !c.inLoop && !c.inCork && !c.inWall;
     m.shadow.position.set(x, sy + 0.05, z);
     m.shadow.rotation.set(onDeck ? -Math.atan(slopeAt(track, c.s)) : 0, th, onDeck ? roll : 0);
-    m.shadow.material.opacity = clamp(1 - rel / 25, 0.15, 1);
+    m.shadow.material.opacity = clamp(1 - rel / 25, 0.15, 1); m.shadow.scale.set(1, 1, 1);
   } else if (c.state === 'fall') {
     m.root.position.copy(c.fp);
     m.root.rotation.set(-c.pitch - c.ftumble, c.fyaw, c.froll);
@@ -2319,7 +2377,7 @@ function setupRace(idx) {
   trackIdx = idx; useTrack(getTrack(idx, curWidth())); applyWeather(track.weather);
   { const tn = $('trackName'); if (tn) { tn.textContent = TRACKS[idx].name; tn.title = TRACKS[idx].name; } } // radan nimi minikartan yläpuolelle
   buildTrackMeshes(track, idx + 1); applyToneFlags();
-  setSunForTrack(idx, track.weather);
+  setSunForTrack(idx, track.weather); SUN.mode = SUN.prefMode; SUN.fit = { c: null }; if (SUN.on) applyShadowMode();
   if (SUN.on) { sun.intensity = curWx.sun[1] * 1.45; hemi.intensity = curWx.hemi[2] * 0.78; } // selvemmät varjot
   trackGroup.traverse(o => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = !(o.material && (o.material.transparent || o.material.type === 'MeshBasicMaterial')); if (o.material && o.material.side === THREE.DoubleSide) o.material.shadowSide = THREE.BackSide; } }); // takapinnat varjokarttaan: ei raidoitusta ajopinnalla
   player = newCar(false, track.L - 10, -3); ai = newCar(true, track.L - 10, 3); ai.lane = 2.5;
@@ -3562,7 +3620,10 @@ document.querySelectorAll('.imgbtn').forEach(b => {
 });
 $('lbNameBtn').onclick = () => lbAskName();
 function syncShadowBtn() { const b = $('shadowBtn'); if (b) { b.setAttribute('aria-pressed', SUN.pref); b.textContent = (SUN.pref ? '☀️ Auringon varjot: päällä' : '☀️ Auringon varjot: pois'); } }
-$('shadowBtn').onclick = () => { SUN.pref = !SUN.pref; SUN.low = false; try { localStorage.setItem('taivasrata-varjot', SUN.pref ? '1' : '0'); } catch (e) {} syncShadowBtn(); setSunForTrack(trackIdx, track.weather); applyWeather(track.weather); if (SUN.on) { sun.intensity = curWx.sun[1] * 1.45; hemi.intensity = curWx.hemi[2] * 0.78; } };
+$('shadowBtn').onclick = () => { SUN.pref = !SUN.pref; SUN.low = false; try { localStorage.setItem('taivasrata-varjot', SUN.pref ? '1' : '0'); } catch (e) {} syncShadowBtn(); setSunForTrack(trackIdx, track.weather); applyWeather(track.weather); if (SUN.on) { SUN.fit = { c: null }; applyShadowMode(); sun.intensity = curWx.sun[1] * 1.45; hemi.intensity = curWx.hemi[2] * 0.78; } };
+function syncRangeBtn() { const b = $('shadowRangeBtn'); if (b) { b.textContent = SUN.prefMode === 'koko' ? '🗺️ Varjojen ulottuvuus: koko rata' : '🗺️ Varjojen ulottuvuus: lähialue'; b.setAttribute('aria-pressed', SUN.prefMode === 'koko'); } }
+$('shadowRangeBtn').onclick = () => { SUN.prefMode = SUN.prefMode === 'koko' ? 'lahi' : 'koko'; SUN.mode = SUN.prefMode; try { localStorage.setItem('taivasrata-varjomatka', SUN.prefMode); } catch (e) {} syncRangeBtn(); if (SUN.on) { SUN.fit = { c: null }; applyShadowMode(); } };
+syncRangeBtn();
 syncShadowBtn();
 $('lbViewBtn').onclick = () => openLbView();
 // Asetukset-näkymä: grafiikka, ohjaus ja ennätyslista ratavalikon takana
@@ -3646,7 +3707,7 @@ function adaptResolution(raw) {
   const avg = adapt.sum / adapt.n; adapt.sum = adapt.n = adapt.t = 0;
   let pr = adapt.pr;
   if (avg > 1 / 40 && pr > 1) { pr = Math.max(1, pr - 0.25); adapt.good = 0; }
-  else if (avg > 1 / 40 && SUN.on) { SUN.low = true; SUN.on = false; sun.castShadow = false; } // tarkkuus jo alimmillaan: varjot pois tältä istunnolta
+  else if (avg > 1 / 40 && SUN.on) { if (SUN.mode === 'koko') { SUN.mode = 'lahi'; applyShadowMode(); adapt.good = 0; } else { SUN.low = true; SUN.on = false; sun.castShadow = false; sunFar.castShadow = false; } } // ensin lähialueen varjot, sitten varjot pois tältä istunnolta
   else if (avg < 1 / 57 && pr < DPR_MAX && ++adapt.good >= 3) { pr = Math.min(DPR_MAX, pr + 0.25); adapt.good = 0; }
   if (pr !== adapt.pr) { adapt.pr = pr; renderer.setPixelRatio(pr); resize(); }
 }
@@ -3679,13 +3740,14 @@ function frame(now) {
       if (gameState === 'over' && !resultShown) { endTimer -= dt; if (endTimer <= 0) showResult(); }
     }
     // autot sijoitetaan ennen kameraa: ohjaamokamera käyttää tämän ruudun asentoa (aiemmin edellisen ruudun → auto nyki kameraan nähden vauhdin ja ruutuajan mukaan)
-    placeCar(player, pMesh, dt); placeCar(ai, aMesh, dt); if (SUN.on) { pMesh.shadow.visible = false; aMesh.shadow.visible = false; }
+    placeCar(player, pMesh, dt); placeCar(ai, aMesh, dt); if (SUN.on) contactShadows();
     updateCamera(dt); updateSun();
     updateHUD(dt);
   }
-  if (gameState === 'menu' || gameState === 'champ') { placeCar(player, pMesh, dt); placeCar(ai, aMesh, dt); if (SUN.on) { pMesh.shadow.visible = false; aMesh.shadow.visible = false; } updateSun(); }
+  if (gameState === 'menu' || gameState === 'champ') { placeCar(player, pMesh, dt); placeCar(ai, aMesh, dt); if (SUN.on) contactShadows(); updateSun(); }
   updateAudio(); updateMusic(dt); drawSpeedLines(dt);
   sky.position.copy(camera.position); updateWeatherFx(dt);
+  farShadowTick(Math.min(0.1, (performance.now() - (farShadowTick.t || 0)) / 1000)); farShadowTick.t = performance.now();
   renderer.render(scene, camera);
 }
 
