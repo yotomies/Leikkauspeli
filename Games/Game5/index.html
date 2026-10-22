@@ -816,12 +816,23 @@ function buildTrack(def, wf) {
   const tr = { weather: def.weather || 'clear', gripMul: WX[0], accMul: WX[1], brakeMul: WX[2], def, name: def.name, N, L, ds, X, Z, HD, K, BK, base: def.base, half: (def.half || 6) * wf, wf, laps: def.laps || LAPS, feats: [], jumps: [], gap: false };
   // kaikki risteyskohdat (rata kulkee itsensä yli tai ali): [sig1, sig2] -parit
   const cand = [];
-  if (def.cross) for (let i = 0; i < N; i += 2) for (let j = i + 2; j < N; j += 2) {
-    if (Math.min(j - i, N - j + i) * ds < 200) continue;
-    const dx = X[i] - X[j], dz = Z[i] - Z[j], d2 = dx * dx + dz * dz;
-    if (d2 < 36) cand.push([i, j, d2]);
+  if (def.cross) {
+    // risteysehdokkaat ruudukkohaulla (6 m solut): sama tulos kuin kaikkien parien vertailu, mutta O(N) eikä O(N²)
+    const CS = 6, grid = new Map(), key = (cx, cz) => cx * 100003 + cz;
+    for (let i = 0; i < N; i += 2) { const k = key(Math.floor(X[i] / CS), Math.floor(Z[i] / CS)); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(i); }
+    for (let i = 0; i < N; i += 2) {
+      const cx = Math.floor(X[i] / CS), cz = Math.floor(Z[i] / CS);
+      for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
+        const a = grid.get(key(cx + ox, cz + oz)); if (!a) continue;
+        for (const j of a) {
+          if (j <= i || Math.min(j - i, N - j + i) * ds < 200) continue;
+          const dx = X[i] - X[j], dz = Z[i] - Z[j], d2 = dx * dx + dz * dz;
+          if (d2 < 36) cand.push([i, j, d2]);
+        }
+      }
+    }
   }
-  cand.sort((a, b) => a[2] - b[2]);
+  cand.sort((a, b) => a[2] - b[2] || a[0] - b[0] || a[1] - b[1]);
   const acc = [];
   const cd = (u, v) => Math.min(Math.abs(u - v), N - Math.abs(u - v)) * ds;
   for (const c of cand) { if (!acc.some(a => (cd(a[0], c[0]) < 60 && cd(a[1], c[1]) < 60) || (cd(a[0], c[1]) < 60 && cd(a[1], c[0]) < 60))) acc.push(c); }
@@ -1144,6 +1155,7 @@ function stepCar(c, inp, dt) {
   if (c.isAI) c.steer = inp.steer; else c.steer += clamp(inp.steer - c.steer, -dt * 6, dt * 6);
   // kaasu ja jarru voivat olla portaattomia (0–1, peliohjaimen liipaisimet) tai tosi/epätosi
   const gasA = typeof inp.gas === 'number' ? inp.gas : (inp.gas ? 1 : 0), brkA = typeof inp.brake === 'number' ? inp.brake : (inp.brake ? 1 : 0);
+  c.brakeA = brkA; // jarruvalot
   c.gas = gasA > 0.05 || inp.boost;
   const sm = samp(tr, c.s); const k = sm.k;
   const av = Math.abs(c.v);
@@ -1372,6 +1384,7 @@ const V3 = THREE.Vector3;
 const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; // elokuvamainen sävykartoitus vain autoihin (applyToneFlags)
 const scene = new THREE.Scene();
 const FOG = 0xc4dcf2;
 scene.fog = new THREE.Fog(FOG, 350, 2700);
@@ -1487,6 +1500,7 @@ function applyWeather(key) {
   setSky(w.hz, w.zen);
   hemi.color.setHex(w.hemi[0]); hemi.groundColor.setHex(w.hemi[1]); hemi.intensity = w.hemi[2];
   sun.color.setHex(w.sun[0]); sun.intensity = w.sun[1];
+  if (typeof buildCarEnv === 'function' && carMats.length) buildCarEnv(w); // autojen heijastukset sään mukaan
   paintGround(...w.ground);
   const c = new THREE.Color();
   for (let i = 0; i < 46; i++) { c.setHSL(w.mount[0] + mountainTone[i][0], w.mount[1], w.mount[2] + mountainTone[i][1] * (key === 'night' ? 0.3 : 1)); mountains.setColorAt(i, c); }
@@ -1523,9 +1537,12 @@ function buildTrackMeshes(tr, seed) {
   const wxk = tr.weather, roadA = new THREE.Color(wxk === 'snow' ? 0xa7afbb : wxk === 'rain' ? 0x4c4f5a : 0x6b6e7c), roadB = new THREE.Color(wxk === 'snow' ? 0x98a1ae : wxk === 'rain' ? 0x42454f : 0x5b5e6b), kerbA = new THREE.Color(0xd6382c), kerbB = new THREE.Color(0xf0f0f0),
     side = new THREE.Color(0x3b3e48), under = new THREE.Color(0x2a2c34), chkW = new THREE.Color(0xffffff), chkB = new THREE.Color(0x111111);
   const KB = 0.9, TH = 0.6;
-  const pt = (s, o, dy) => {
-    const h = heightAt(tr, s) + bankAt(tr, s) * o; const sm = samp(tr, s);
-    return [sm.x + sm.lx * o + sm.nx * dy, h + sm.ly * o + sm.ny * dy, sm.z + sm.lz * o + sm.nz * dy];
+  // radan poikkileikkauksen kehys lasketaan kerran per kohta (aiemmin jokaiselle kulmapisteelle erikseen, ~12x)
+  const frames = new Map();
+  const frameAt = s => { let f = frames.get(s); if (!f) { const h = heightAt(tr, s), bk = bankAt(tr, s), sm = samp(tr, s);
+    f = { h, bk, x: sm.x, z: sm.z, lx: sm.lx, ly: sm.ly, lz: sm.lz, nx: sm.nx, ny: sm.ny, nz: sm.nz }; frames.set(s, f); } return f; };
+  const pt = (s, o, dy) => { const f = frameAt(s);
+    return [f.x + f.lx * o + f.nx * dy, f.h + f.bk * o + f.ly * o + f.ny * dy, f.z + f.lz * o + f.nz * dy];
   };
   const isGap = s => { heightAt(tr, s); return tr.gap; };
   const n = Math.ceil(tr.L);
@@ -1571,11 +1588,18 @@ function buildTrackMeshes(tr, seed) {
   const mats = [], d = new THREE.Object3D();
   const box = (x, y, z, sx, sy, sz, yaw) => { d.position.set(x, y, z); d.rotation.set(0, yaw, 0); d.scale.set(sx, sy, sz); d.updateMatrix(); mats.push(d.matrix.clone()); };
   const beam = (a, b, th) => { const len = a.distanceTo(b); d.position.copy(a).add(b).multiplyScalar(0.5); d.rotation.set(0, 0, 0); d.scale.set(th, th, len); d.lookAt(b); d.updateMatrix(); mats.push(d.matrix.clone()); };
+  // onko pilarin kohdalla toinen ratakansi: radan näytteet ruudukkoon (10 m solut), haku vain lähisoluista (aiemmin koko rata joka pilarille)
+  const BR = HALF + 1.5, BCS = Math.max(10, BR), bgrid = new Map(), bkey = (cx, cz) => cx * 100003 + cz;
+  for (let j = 0; j < tr.N; j += 3) { const k = bkey(Math.floor(tr.X[j] / BCS), Math.floor(tr.Z[j] / BCS)); let a = bgrid.get(k); if (!a) bgrid.set(k, a = []); a.push(j); }
   const blocked = (x, z, top, s) => {
-    for (let j = 0; j < tr.N; j += 3) {
-      const sj = j * tr.ds; if (Math.abs(wrapD(sj - s, tr.L)) < 40) continue;
-      const dx = tr.X[j] - x, dz = tr.Z[j] - z; if (dx * dx + dz * dz > (HALF + 1.5) * (HALF + 1.5)) continue;
-      if (heightAt(tr, sj) < top + 1) return true;
+    const cx = Math.floor(x / BCS), cz = Math.floor(z / BCS);
+    for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
+      const a = bgrid.get(bkey(cx + ox, cz + oz)); if (!a) continue;
+      for (const j of a) {
+        const sj = j * tr.ds; if (Math.abs(wrapD(sj - s, tr.L)) < 40) continue;
+        const dx = tr.X[j] - x, dz = tr.Z[j] - z; if (dx * dx + dz * dz > BR * BR) continue;
+        if (heightAt(tr, sj) < top + 1) return true;
+      }
     }
     return false;
   };
@@ -1707,6 +1731,27 @@ function buildTrackMeshes(tr, seed) {
 }
 
 // ---------- Autot ----------
+// ---------- Suorituskyky: auton staattiset osat yhdistetään materiaaleittain (yksi piirtokutsu per materiaali) ----------
+function mergeMeshes(meshes, parent) {
+  const byMat = new Map();
+  meshes.forEach(m => { if (!byMat.has(m.material)) byMat.set(m.material, []); byMat.get(m.material).push(m); });
+  const out = [];
+  byMat.forEach((list, mat) => {
+    if (list.length < 2) { out.push(...list); return; }
+    const pos = [], nor = [];
+    list.forEach(m => {
+      m.updateMatrix(); const geo = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()); geo.applyMatrix4(m.matrix);
+      if (!geo.attributes.normal) geo.computeVertexNormals();
+      pos.push(geo.attributes.position.array); nor.push(geo.attributes.normal.array); geo.dispose();
+      parent.remove(m); m.geometry.dispose();
+    });
+    const cat = arrs => { const n = arrs.reduce((s, a) => s + a.length, 0), r = new Float32Array(n); let o = 0; arrs.forEach(a => { r.set(a, o); o += a.length; }); return r; };
+    const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.BufferAttribute(cat(pos), 3)); bg.setAttribute('normal', new THREE.BufferAttribute(cat(nor), 3));
+    bg.computeBoundingSphere();
+    const mm = new THREE.Mesh(bg, mat); mm.frustumCulled = false; parent.add(mm); out.push(mm);
+  });
+  return out;
+}
 // ---------- Ohjaamon mittaristo: kojelaudan ja ratin näytöt, vaihtovalot ja vaihdeläpät ----------
 function makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps) {
   const X = dc.getContext('2d'), W = wc.getContext('2d');
@@ -1736,7 +1781,7 @@ function makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps) {
     X.fillStyle = on ? '#ffffff' : '#6b707a'; X.font = 'bold 15px monospace'; X.textAlign = 'center'; X.fillText(txt, x, y + 38);
   }
   function draw(c, rpm, gear, kmh, lit) {
-    X.drawImage(bg, 0, 0);
+    X.setTransform(0.75, 0, 0, 0.75, 0, 0); X.drawImage(bg, 0, 0);
     // nopeusmittari 0–260 km/h
     const s0 = Math.PI * 0.75, sw = Math.PI * 1.5, sa = v => s0 + sw * clamp(v / 260, 0, 1);
     X.textAlign = 'center'; X.font = 'bold 19px monospace';
@@ -1770,7 +1815,8 @@ function makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps) {
     }
     X.restore();
     dtex.needsUpdate = true;
-    // ratin näyttö: vaihde ja nopeus
+  }
+  function drawWheel(c, gear, lit, blink) {
     W.fillStyle = '#04070a'; W.fillRect(0, 0, 256, 128); W.strokeStyle = '#2b3440'; W.lineWidth = 4; W.strokeRect(2, 2, 252, 124);
     W.fillStyle = '#58ff8a'; W.font = 'bold 92px monospace'; W.textAlign = 'center'; W.fillText(gear, 72, 104);
     W.fillStyle = '#ffffff'; W.font = 'bold 44px monospace'; W.fillText(kmhText(c.v), 180, 62); W.fillStyle = '#8a8f99'; W.font = '18px monospace'; W.fillText('km/h', 180, 84);
@@ -1778,6 +1824,7 @@ function makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps) {
     if (lit >= 10) { W.fillStyle = blink ? '#3a7bff' : '#04070a'; W.fillRect(8, 8, 240, 10); }
     wtex.needsUpdate = true;
   }
+  let dKey = '', wKey = '';
   const COLS = [0x22e05a, 0x22e05a, 0x22e05a, 0xffd000, 0xffd000, 0xffd000, 0xff2a1a, 0xff2a1a, 0xff2a1a, 0xff2a1a];
   return {
     reset() { st.maxR = 0; st.gear = 0; },
@@ -1799,30 +1846,105 @@ function makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps) {
         l.material.color.setHex(col);
       });
       // näytöt päivitetään noin 20 kertaa sekunnissa
-      if ((st.acc = (st.acc || 0) + dt) >= 0.05) { st.acc = 0; draw(c, rpm, gear, c.v * 3.6, lit); }
+      if ((st.acc = (st.acc || 0) + dt) >= 0.05) {
+        st.acc = 0; const blk = Math.floor(st.t * 6) % 2 === 0;
+        // piirretään uudelleen vain, jos näkyvä arvo muuttui (tekstuurin siirto näytönohjaimelle on kallein vaihe)
+        const k1 = Math.round(Math.abs(c.v) * 1.8) + '|' + Math.round(rpm * 20) + '|' + gear + '|' + Math.round(st.maxR * 20) + '|' + Math.floor(clamp((c.damage - 5) / 55, 0, 1) * 16) + '|' + (c.boost > 20 || c.boosting) + (curWx.lights > 0) + (c.damage > 50 && (c.damage < 75 || blk)) + (!c.grounded && blk);
+        if (k1 !== dKey) { dKey = k1; draw(c, rpm, gear, c.v * 3.6, lit); }
+        const k2 = kmhText(c.v) + '|' + gear + '|' + Math.ceil(c.boost / 12.5) + '|' + (lit >= 10 && blk);
+        if (k2 !== wKey) { wKey = k2; drawWheel(c, gear, lit, blk); }
+      }
+    }
+  };
+}
+// ---------- Autojen materiaalit: fysikaalinen maali, kromi ja kumi + taivaasta laskettu heijastus ----------
+let carEnvRT = null; const carMats = [];
+function buildCarEnv(w) {
+  try {
+    const pm = new THREE.PMREMGenerator(renderer), sc = new THREE.Scene();
+    const geo = new THREE.SphereGeometry(50, 32, 16), col = [], c = new THREE.Color(), top = new THREE.Color(w.zen), hz = new THREE.Color(w.hz), gr = new THREE.Color(w.ground[0]);
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const y = p.getY(i) / 50; if (y > 0) c.copy(hz).lerp(top, Math.pow(y, 0.6)); else c.copy(hz).lerp(gr, Math.min(1, -y * 4)); col.push(c.r, c.g, c.b); }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    sc.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+    const sunC = new THREE.Color(w.sun[0]).multiplyScalar(1.2 + w.sun[1] * 5); // kiiltopiste
+    const s = new THREE.Mesh(new THREE.SphereGeometry(5, 12, 8), new THREE.MeshBasicMaterial({ color: sunC })); s.position.set(22, 30, 14); sc.add(s);
+    if (w.lights) for (let k = 0; k < 6; k++) { const l = new THREE.Mesh(new THREE.SphereGeometry(1.6, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd9a0 })); l.position.set(Math.cos(k) * 45, 3 + k % 3, Math.sin(k) * 45); sc.add(l); } // yöllä valopisteitä
+    const rt = pm.fromScene(sc, 0.02); pm.dispose(); geo.dispose();
+    if (carEnvRT) carEnvRT.dispose(); carEnvRT = rt;
+    carMats.forEach(m => { m.envMap = rt.texture; m.needsUpdate = true; });
+  } catch (e) {}
+}
+// sävykartoitus koskee vain autojen materiaaleja: radat, maisema, taivas ja näytöt pysyvät ennallaan
+function applyToneFlags() { const cs = new Set(carMats); scene.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; ms.forEach(m => { const want = cs.has(m); if (m.toneMapped !== want) { m.toneMapped = want; m.needsUpdate = true; } }); }); }
+const carStd = (c, rough, metal, envI = 1) => { const m = new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: metal, envMap: carEnvRT ? carEnvRT.texture : null, envMapIntensity: envI }); carMats.push(m); return m; };
+// pyöristetty laatikko: pyöristetty suorakulmio pursotettuna ja viistetty reunoista (valo taittuu reunoista kuten oikeassa korissa)
+function roundedBox(w, h, d, r) {
+  r = Math.min(r, w / 2 - 0.002, h / 2 - 0.002, d / 2 - 0.002); const b = r * 0.6, rc = r * 0.5, W = w - 2 * b, H = h - 2 * b;
+  const s = new THREE.Shape(), x0 = -W / 2, y0 = -H / 2;
+  s.moveTo(x0 + rc, y0); s.lineTo(x0 + W - rc, y0); s.quadraticCurveTo(x0 + W, y0, x0 + W, y0 + rc); s.lineTo(x0 + W, y0 + H - rc); s.quadraticCurveTo(x0 + W, y0 + H, x0 + W - rc, y0 + H);
+  s.lineTo(x0 + rc, y0 + H); s.quadraticCurveTo(x0, y0 + H, x0, y0 + H - rc); s.lineTo(x0, y0 + rc); s.quadraticCurveTo(x0, y0, x0 + rc, y0);
+  const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.001, d - 2 * b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, steps: 1, curveSegments: 3 });
+  g.translate(0, 0, -(d - 2 * b) / 2); return g;
+}
+// teippaukset: numero, nimi, sponsorit ja raidat (piirretään kankaalle, joka on kylkien ja keulan kuvana)
+const SPONSORS = ['KUILU RACING', 'NOSTOSILTA OY', 'TAIVAS TIRES', 'SILMUKKA OIL', 'KORKKIRUUVI', 'SEINÄMÄ SPORT', 'PILVI MOTORS', 'LOOPPI LUBE'];
+function makeLivery(body) {
+  const sc = document.createElement('canvas'); sc.width = 1024; sc.height = 128; const sx = sc.getContext('2d'), st = new THREE.CanvasTexture(sc);
+  const nc = document.createElement('canvas'); nc.width = nc.height = 128; const nx = nc.getContext('2d'), nt = new THREE.CanvasTexture(nc);
+  const mk = (tex, w, h) => { const mt = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.32, metalness: 0.2, envMap: carEnvRT ? carEnvRT.texture : null, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); carMats.push(mt); return new THREE.Mesh(new THREE.PlaneGeometry(w, h), mt); };
+  for (const s of [-1, 1]) { const p = mk(st, 1.6, 0.3); p.position.set(s * 0.857, 0.6, 0.15); p.rotation.y = s * Math.PI / 2; body.add(p); } // pyörien ja ilmanottojen väliin
+  const np = mk(nt, 0.44, 0.44); np.position.set(0, 0.763, 1.22); np.rotation.x = -Math.PI / 2; body.add(np);
+  const hex = n => '#' + n.toString(16).padStart(6, '0');
+  return {
+    draw(name, num, col, acc) {
+      const h = [...(name || '')].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7), sp1 = SPONSORS[h % SPONSORS.length], sp2 = SPONSORS[(h >> 3) % SPONSORS.length];
+      sx.clearRect(0, 0, 1024, 128);
+      sx.fillStyle = hex(acc); sx.fillRect(0, 96, 1024, 10); sx.fillRect(0, 112, 1024, 5);                 // kilparaidat
+      sx.fillStyle = 'rgba(255,255,255,0.95)'; sx.beginPath(); sx.arc(70, 56, 50, 0, 7); sx.fill();        // numeropallo
+      sx.fillStyle = '#0b0d12'; sx.font = 'bold 62px sans-serif'; sx.textAlign = 'center'; sx.textBaseline = 'middle'; sx.fillText(num, 70, 60);
+      sx.fillStyle = '#ffffff'; sx.strokeStyle = 'rgba(0,0,0,0.55)'; sx.lineWidth = 4; sx.font = 'bold italic 34px sans-serif'; sx.textAlign = 'left';
+      const nm = (name || '').toUpperCase(); sx.font = 'bold italic ' + (nm.length > 14 ? 34 : 40) + 'px sans-serif'; sx.strokeText(nm, 140, 46); sx.fillText(nm, 140, 46);
+      sx.font = 'bold 24px sans-serif'; sx.fillStyle = hex(acc); sx.fillText(sp1, 142, 82);
+      sx.fillStyle = 'rgba(10,12,18,0.85)'; sx.fillRect(760, 26, 250, 50); sx.fillStyle = '#ffffff'; sx.font = 'bold 26px sans-serif'; sx.textAlign = 'center'; sx.fillText(sp2, 885, 52);
+      st.needsUpdate = true;
+      nx.clearRect(0, 0, 128, 128); nx.fillStyle = 'rgba(255,255,255,0.95)'; nx.beginPath(); nx.arc(64, 64, 56, 0, 7); nx.fill();
+      nx.fillStyle = '#0b0d12'; nx.font = 'bold 70px sans-serif'; nx.textAlign = 'center'; nx.textBaseline = 'middle'; nx.fillText(num, 64, 68); nt.needsUpdate = true;
     }
   };
 }
 function makeCar(color, accent, withCockpit, style) {
   const root = new THREE.Group(); root.rotation.order = 'YXZ';
   const body = new THREE.Group(); root.add(body);
-  const lam = c => new THREE.MeshPhongMaterial({ color: c, flatShading: true, shininess: 18, specular: 0x222222 });
-  const mBody = lam(color), mAcc = lam(accent), mDark = lam(0x22242b), mChrome = lam(0xc9ced8), mTyre = lam(0x18181c), mHub = lam(0xdddddd);
+  const lam = c => carStd(c, 0.6, 0.15);
+  const mBody = carStd(color, 0.26, 0.35), mAcc = carStd(accent, 0.3, 0.3), mDark = carStd(0x22242b, 0.55, 0.25), mChrome = carStd(0xe2e6ee, 0.12, 1.0, 1.3), mTyre = carStd(0x17171b, 0.92, 0.0, 0.3), mHub = carStd(0xd4d7dd, 0.22, 0.9, 1.2);
   const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
   // ---- korityypit: 0 kiila, 1 nuoli, 2 putkikehikko (buggy), 3 lokasuojat (roadster) ----
-  const ST = style || 0, mCarbon = lam(0x15161a), mRed = new THREE.MeshBasicMaterial({ color: 0xff2a1a }), mLamp = new THREE.MeshBasicMaterial({ color: 0xfff3c4 });
-  const box = (w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = add(new THREE.BoxGeometry(w, h, d), mat, x, y, z); m.rotation.set(rx, ry, rz); return m; };
+  const ST = style || 0, mCarbon = carStd(0x15161a, 0.38, 0.35), mRed = new THREE.MeshBasicMaterial({ color: 0x7a1208 }), mLamp = new THREE.MeshBasicMaterial({ color: 0xfff3c4 });
+  const mRev = new THREE.MeshBasicMaterial({ color: 0x2a2a2a }), mTip = new THREE.MeshBasicMaterial({ color: 0x2a2a30 }), mVisor = carStd(0x101216, 0.12, 0.9, 1.4);
+  // isommat osat pyöristetyillä reunoilla, ohuet levyt (siivet yms.) suorina
+  const box = (w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const mn = Math.min(w, h, d); const m = add(mn >= 0.1 ? roundedBox(w, h, d, Math.min(0.07, mn * 0.28)) : new THREE.BoxGeometry(w, h, d), mat, x, y, z); m.rotation.set(rx, ry, rz); return m; };
   const tube = (r, x1, y1, z1, x2, y2, z2, mat) => { // putki kahden pisteen välille
     const a = new THREE.Vector3(x1, y1, z1), b = new THREE.Vector3(x2, y2, z2), L = a.distanceTo(b);
     const m = add(new THREE.CylinderGeometry(r, r, L, 6), mat, (x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2);
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.sub(a).normalize()); return m;
   };
   // runko-allas (sama kaikilla: ohjaamonäkymä perustuu tähän)
-  box(1.7, 0.32, 3.5, mBody, 0, 0.6, 0);
+  // runkoallas sivuprofiilista pursotettuna: viisto keula ja perä, pyöristetyt reunat (yläpinta ohjaamon kohdalla ennallaan)
+  { const s = new THREE.Shape(), P = [[-1.71, 0.47], [1.71, 0.47], [1.71, 0.63], [1.35, 0.72], [-1.25, 0.72], [-1.71, 0.66]];
+    s.moveTo(P[0][0], P[0][1]); for (let k = 1; k < P.length; k++) s.lineTo(P[k][0], P[k][1]); s.lineTo(P[0][0], P[0][1]);
+    const tg = new THREE.ExtrudeGeometry(s, { depth: 1.62, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 2, steps: 1, curveSegments: 2 });
+    tg.translate(0, 0, -0.81); tg.rotateY(-Math.PI / 2); add(tg, mBody, 0, 0, 0); }
+  // paneelirajat ja niitit kylkiin ja konepeltiin
+  const mSeam = carStd(0x0c0d10, 0.7, 0.1), mRiv = carStd(0xb9bec8, 0.25, 0.9);
+  for (const sx of [-1, 1]) {
+    for (const zz of [-0.78, 1.02]) add(new THREE.BoxGeometry(0.006, 0.24, 0.012), mSeam, sx * 0.853, 0.6, zz);
+    add(new THREE.BoxGeometry(0.006, 0.01, 3.2), mSeam, sx * 0.853, 0.455, 0);
+    for (let k = 0; k < 13; k++) add(new THREE.SphereGeometry(0.011, 5, 4), mRiv, sx * 0.83, 0.765, -1.5 + k * 0.25);
+  }
+  add(new THREE.BoxGeometry(1.4, 0.006, 0.012), mSeam, 0, 0.765, 1.02);
   box(1.76, 0.1, 3.3, mCarbon, 0, 0.42, 0);                                  // pohjalevy
   for (const sx of [-1, 1]) {
-    box(0.06, 0.12, 2.2, mAcc, sx * 0.86, 0.66, 0.1);                       // sivuraita
-    const rd = add(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 18), mAcc, sx * 0.861, 0.62, -0.35); rd.rotation.z = Math.PI / 2; // numeropallo
     box(0.18, 0.2, 0.5, mCarbon, sx * 0.9, 0.68, -0.85);                     // sivuilmanotto
     if (!withCockpit) { const mir = box(0.16, 0.1, 0.06, mAcc, sx * 0.9, 1.08, 0.55); mir.rotation.y = sx * 0.25; tube(0.015, sx * 0.72, 0.95, 0.55, sx * 0.84, 1.06, 0.55, mDark); } // peilit (ei pelaajan autossa: peittäisivät ohjaamonäkymää)
   }
@@ -1864,17 +1986,21 @@ function makeCar(color, accent, withCockpit, style) {
     for (let k = 0; k < 4; k++) add(new THREE.CylinderGeometry(0.045, 0.06, 0.18, 8), mChrome, sx * 0.2, 1.22, -0.8 - k * 0.22); // imutorvet
   }
   box(0.4, 0.26, 0.5, mCarbon, 0, 1.36, -1.05);                               // ilmanotto
-  for (const sx of [-1, 1]) { const ex = add(new THREE.CylinderGeometry(0.08, 0.1, 0.9, 8), mChrome, sx * 0.3, 0.78, -1.95); ex.rotation.x = Math.PI / 2; }
+  for (const sx of [-1, 1]) { const ex = add(new THREE.CylinderGeometry(0.08, 0.1, 0.9, 10), mChrome, sx * 0.3, 0.78, -1.95); ex.rotation.x = Math.PI / 2; const tp = add(new THREE.CylinderGeometry(0.088, 0.088, 0.05, 10), mTip, sx * 0.3, 0.78, -2.42); tp.rotation.x = Math.PI / 2; } // pakoputket ja hehkuvat päät
   box(1.4, 0.12, 0.25, mCarbon, 0, 0.5, -1.85, 0.3);                           // diffuusori
-  for (const sx of [-1, 1]) { box(0.3, 0.12, 0.05, mRed, sx * 0.55, 0.72, -1.76); box(0.28, 0.16, 0.06, mLamp, sx * 0.5, 0.7, ST === 1 ? 1.6 : 2.56); } // taka- ja ajovalot
+  for (const sx of [-1, 1]) { add(new THREE.BoxGeometry(0.3, 0.12, 0.05), mRed, sx * 0.55, 0.72, -1.765); add(new THREE.BoxGeometry(0.12, 0.08, 0.04), mRev, sx * 0.3, 0.6, -1.77); add(new THREE.BoxGeometry(0.28, 0.16, 0.06), mLamp, sx * 0.5, 0.7, ST === 1 ? 1.6 : 2.56); } // jarru-, peruutus- ja ajovalot
   // pyörät: rengas, vanne puolineen, jarrulevy; tukivarret runkoon
-  const wheels = [], pivots = [], rimM = ST === 3 ? mChrome : mHub;
+  const wheels = [], pivots = [], rimM = ST === 3 ? mChrome : mHub, mSide = carStd(0x2d2e34, 0.85, 0.0, 0.3), mCal = carStd([0xd8261c, 0xffc400, 0x2a6cff, 0xd8261c][ST], 0.35, 0.3);
   for (const [wx, wz] of [[-1.05, 1.3], [1.05, 1.3], [-1.05, -1.3], [1.05, -1.3]]) {
-    const big = ST === 2 && wz < 0, R = big ? 0.56 : 0.48, W = big ? 0.52 : 0.44;
+    const big = ST === 2 && wz < 0, R = big ? 0.53 : 0.45, W = big ? 0.52 : 0.44, sx0 = Math.sign(wx);
     const pivot = new THREE.Group(); pivot.position.set(wx, R, wz); root.add(pivot);
     const spin = new THREE.Group(); pivot.add(spin);
-    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(R, R, W, 18), mTyre); tyre.rotation.z = Math.PI / 2; spin.add(tyre);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.62, R * 0.62, W + 0.06, 16), rimM); rim.rotation.z = Math.PI / 2; spin.add(rim);
+    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(R, R, W, 22), mTyre); tyre.rotation.z = Math.PI / 2; spin.add(tyre);
+    const side = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.86, R * 0.86, W + 0.012, 22), mSide); side.rotation.z = Math.PI / 2; spin.add(side); // renkaan kylki
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.62, R * 0.62, W + 0.06, 18), rimM); rim.rotation.z = Math.PI / 2; spin.add(rim);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.5, R * 0.5, 0.03, 18), mDark); disc.rotation.z = Math.PI / 2; disc.position.x = -sx0 * W * 0.12; spin.add(disc); // jarrulevy
+    for (let k = 0; k < 5; k++) { const a = k * Math.PI * 2 / 5, nut = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.03, 6), rimM); nut.rotation.z = Math.PI / 2; nut.position.set(sx0 * (W / 2 + 0.05), Math.cos(a) * 0.12, Math.sin(a) * 0.12); spin.add(nut); } // pultit
+    const cal = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.16, 0.13), mCal); cal.position.set(-sx0 * W * 0.12, R * 0.32, -R * 0.2); pivot.add(cal); // jarrusatula (ei pyöri)
     const hubC = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, W + 0.1, 8), mDark); hubC.rotation.z = Math.PI / 2; spin.add(hubC);
     for (let k = 0; k < 5; k++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(W + 0.08, R * 1.05, 0.07), mDark); sp.rotation.x = k * Math.PI / 5; spin.add(sp); } // puolat
     wheels.push(spin); if (wz > 0) pivots.push(pivot);
@@ -1924,9 +2050,9 @@ function makeCar(color, accent, withCockpit, style) {
     add(new THREE.BoxGeometry(0.52, 0.08, 0.5), mTrim, 0, 0.92, -0.25);                       // istuin
     add(new THREE.BoxGeometry(0.52, 0.55, 0.1), mTrim, 0, 1.18, -0.5);                        // selkänoja
     // ---- kojelauta: hiilikuitupaneeli, nopeusmittari, käännetty kierroslukumittari ja merkkivalot piirretään tekstuuriin ----
-    const dc = document.createElement('canvas'); dc.width = 1024; dc.height = 256; const dtex = new THREE.CanvasTexture(dc);
+    const dc = document.createElement('canvas'); dc.width = 768; dc.height = 192; const dtex = new THREE.CanvasTexture(dc); // 0,75-mittakaava: 44 % vähemmän siirrettävää dataa
     const dg = new THREE.Group(); dg.position.set(0, 0.94, 0.6); dg.rotation.x = -0.25; body.add(dg);
-    const dpl = new THREE.Mesh(new THREE.PlaneGeometry(1.08, 0.27), new THREE.MeshBasicMaterial({ map: dtex })); dpl.rotation.y = Math.PI; dg.add(dpl);
+    const dpl = new THREE.Mesh(new THREE.PlaneGeometry(1.08, 0.27), new THREE.MeshBasicMaterial({ map: dtex, toneMapped: false })); dpl.rotation.y = Math.PI; dg.add(dpl);
     // kytkinpaneeli oikealla alhaalla: vipukytkimet ja punainen käynnistysnappi suojakannella
     const sp = new THREE.Group(); sp.position.set(-0.4, 0.8, 0.6); sp.rotation.x = -0.6; body.add(sp);
     const mCf = lam(0x1a1b20), mSw = lam(0xd8dde6);
@@ -1949,9 +2075,9 @@ function makeCar(color, accent, withCockpit, style) {
       const b = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.012, 10), new THREE.MeshBasicMaterial({ color: bc })); b.rotation.x = Math.PI / 2; b.position.set(bx, by, -0.012); steerWheel.add(b);
     }
     const wc = document.createElement('canvas'); wc.width = 256; wc.height = 128; const wtex = new THREE.CanvasTexture(wc);
-    const wdisp = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.085), new THREE.MeshBasicMaterial({ map: wtex })); wdisp.rotation.y = Math.PI; wdisp.position.set(0, 0.005, -0.0135); steerWheel.add(wdisp);
+    const wdisp = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.085), new THREE.MeshBasicMaterial({ map: wtex, toneMapped: false })); wdisp.rotation.y = Math.PI; wdisp.position.set(0, 0.005, -0.0135); steerWheel.add(wdisp);
     const leds = [];
-    for (let k = 0; k < 10; k++) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.012, 0.01), new THREE.MeshBasicMaterial({ color: 0x111111 })); l.position.set(-(k - 4.5) * 0.024, 0.066, -0.014); steerWheel.add(l); leds.push(l); } // vasemmalta oikealle
+    for (let k = 0; k < 10; k++) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.012, 0.01), new THREE.MeshBasicMaterial({ color: 0x111111, toneMapped: false })); l.position.set(-(k - 4.5) * 0.024, 0.066, -0.014); steerWheel.add(l); leds.push(l); } // vasemmalta oikealle
     const paddles = [];
     for (const sx of [-1, 1]) { const pg = new THREE.Group(); pg.position.set(-sx * 0.12, 0.02, 0.03); const p = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.008), mCarbon2); p.position.x = -sx * 0.03; pg.add(p); steerWheel.add(pg); paddles.push(pg); } // [vasen = alas, oikea = ylös]
     // merkkivalot kojelaudan päällä ratin molemmin puolin: TURBO, VALOT | RUNKO, ILMA
@@ -1959,7 +2085,7 @@ function makeCar(color, accent, withCockpit, style) {
     [['TURBO', 0x2bd15a, 0.37], ['VALOT', 0x3a7bff, 0.28], ['RUNKO', 0xff2a1a, -0.28], ['ILMA', 0xffb000, -0.37]].forEach(([txt, col, x]) => {
       const lc = document.createElement('canvas'); lc.width = 128; lc.height = 48; const lx = lc.getContext('2d');
       lx.fillStyle = '#ffffff'; lx.fillRect(0, 0, 128, 48); lx.fillStyle = '#000000'; lx.font = 'bold 26px monospace'; lx.textAlign = 'center'; lx.fillText(txt, 64, 34);
-      const l = new THREE.Mesh(new THREE.PlaneGeometry(0.085, 0.032), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(lc), color: 0x3a3c42 }));
+      const l = new THREE.Mesh(new THREE.PlaneGeometry(0.085, 0.032), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(lc), color: 0x3a3c42, toneMapped: false }));
       l.userData.col = col; l.rotation.set(0.2, Math.PI, 0); l.position.set(x, 1.112, 0.66); body.add(l); lamps.push(l);
       add(new THREE.BoxGeometry(0.097, 0.044, 0.014), mTrim, x, 1.11, 0.668).rotation.x = -0.2; // kehys
     });
@@ -1968,23 +2094,55 @@ function makeCar(color, accent, withCockpit, style) {
     const lever = add(new THREE.CylinderGeometry(0.012, 0.012, 0.26, 6), mMetal, 0.3, 1.0, 0.1); lever.rotation.x = 0.25;
     add(new THREE.SphereGeometry(0.035, 10, 8), mGrip, 0.3, 1.13, 0.13);
   }
+  // ---- kuljettaja: haalari, kädet ratissa ja kypärä (kypärä kallistuu kaarteissa) ----
+  const drv = new THREE.Group(); body.add(drv);
+  const dAdd = (geo, mat, x, y, z) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); drv.add(o); return o; };
+  dAdd(roundedBox(0.52, 0.5, 0.34, 0.1), mAcc, 0, 0.98, -0.28);                       // vartalo
+  dAdd(new THREE.CylinderGeometry(0.07, 0.08, 0.12, 8), mDark, 0, 1.24, -0.25);          // kaula
+  for (const s of [-1, 1]) {
+    const a = new THREE.Vector3(s * 0.25, 1.12, -0.22), b = new THREE.Vector3(s * 0.16, 1.04, 0.36), L = a.distanceTo(b);
+    const arm = dAdd(new THREE.CylinderGeometry(0.05, 0.06, L, 8), mAcc, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    dAdd(new THREE.SphereGeometry(0.06, 8, 6), mDark, b.x, b.y, b.z);                      // hanska
+  }
+  const helmet = new THREE.Group(); helmet.position.set(0, 1.36, -0.24); body.add(helmet);
+  const hm = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), mBody); hm.scale.set(1, 1.05, 1.1); helmet.add(hm);
+  const vis = new THREE.Mesh(new THREE.SphereGeometry(0.172, 16, 8, -0.9, 1.8, 1.2, 0.6), mVisor); vis.scale.set(1, 1.05, 1.1); vis.rotation.y = 0; helmet.add(vis); // visiiri
+  const hst = new THREE.Mesh(new THREE.TorusGeometry(0.168, 0.018, 6, 20, Math.PI), mAcc); hst.rotation.set(0, Math.PI / 2, 0); hst.scale.set(1, 1.05, 1.1); helmet.add(hst); // kypärän raita
+  // ---- teippaukset ----
+  const livery = makeLivery(body); livery.draw(withCockpit ? 'Taivasrata' : 'Haastaja', withCockpit ? 1 : 99, color, accent);
+  // ---- savu vaurioituneesta moottorista (maailmankoordinaateissa, jää jälkeen) ----
+  const smoke = []; for (let k = 0; k < 10; k++) { const p = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35, 0), new THREE.MeshBasicMaterial({ color: 0x55585e, transparent: true, opacity: 0, depthWrite: false })); p.visible = false; p.userData.t = 9; scene.add(p); smoke.push(p); }
   // ohjaamonäkymää varten: kuljettajan takana olevat osat ja kojelaudan/ratin osat
-  const interior = withCockpit ? body.children.slice(ckStart).filter(o => o.position.z > 0.2) : [];
-  const rear = body.children.filter(o => o.position.z < -0.3 || (o.position.y > 1.5 && o.position.z < 0));
-  return { root, body, wheels, pivots, shadow, cable, mBody, mAcc, steerWheel, speedNeedle, revNeedle, dashUI, flames, head, interior, rear };
+  let interior = withCockpit ? body.children.slice(ckStart).filter(o => o.position.z > 0.2) : [];
+  let rear = body.children.filter(o => o !== drv && o !== helmet && (o.position.z < -0.3 || (o.position.y > 1.5 && o.position.z < 0)));
+  // yhdistetään: tavalliset, ohjaamon sisäosat ja takaosat omina ryhminään (näkyvyyttä vaihdetaan ryhmittäin)
+  const fset = new Set(flames), iset = new Set(interior), rset = new Set(rear);
+  const mergeable = o => o.isMesh && o.visible && !fset.has(o) && !(o.material && o.material.map) && !o.children.length;
+  const kids = body.children.slice();
+  const iM = kids.filter(o => iset.has(o) && mergeable(o)), rM = kids.filter(o => rset.has(o) && !iset.has(o) && mergeable(o)), sM = kids.filter(o => !iset.has(o) && !rset.has(o) && mergeable(o));
+  const iOut = mergeMeshes(iM, body), rOut = mergeMeshes(rM, body); mergeMeshes(sM, body);
+  interior = interior.filter(o => !iM.includes(o)).concat(iOut); rear = rear.filter(o => !rM.includes(o) || iset.has(o)).concat(rOut);
+  wheels.forEach(sp => mergeMeshes(sp.children.filter(o => o.isMesh), sp));   // pyörän osat pyörivät yhdessä
+  if (steerWheel) mergeMeshes(steerWheel.children.filter(o => o.isMesh && !(o.material && o.material.map) && o.material.type !== 'MeshBasicMaterial'), steerWheel); // ratin runko (ei näyttöä, valoja eikä nappeja)
+  body.children.filter(o => o.isGroup && o !== steerWheel).forEach(gp => { if (gp.children.every(o => o.isMesh)) mergeMeshes(gp.children.filter(o => !(o.material && o.material.map) && o.material.type !== 'MeshBasicMaterial'), gp); });
+  if (withCockpit) rear.push(drv, helmet); // kuljettaja piiloon ohjaamonäkymässä
+  return { root, body, wheels, pivots, shadow, cable, mBody, mAcc, steerWheel, speedNeedle, revNeedle, dashUI, flames, head, interior, rear,
+    mRed, mRev, mTip, helmet, livery, smoke, baseCol: new THREE.Color(color), roll: 0, accS: 0, heat: 0, smokeT: 0 };
 }
 
+buildCarEnv(WEATHER.clear);
 const pMesh = makeCar(0xd8262b, 0xffcc00, true);
 // vastustajan autot: neljä korityyppiä, kisaan valitaan yksi (mestaruussarjassa kuljettajan oma, muuten satunnainen)
 const aMeshes = [0, 1, 2, 3].map(st => makeCar(0x1f5fd6, 0xe9eef7, false, st));
 let aMesh = aMeshes[0];
 aMeshes.forEach((m, k) => { m.root.visible = k === 0; if (k) m.shadow.visible = false; });
-function setAiCar(st, col, acc) {
+function setAiCar(st, col, acc, name, num) {
   const prev = aMesh; aMesh = aMeshes[st];
   aMeshes.forEach(m => { const on = m === aMesh; m.root.visible = on; if (!on) m.shadow.visible = false; });
-  aMesh.mBody.color.setHex(col); aMesh.mAcc.color.setHex(acc);
+  aMesh.baseCol.setHex(col); aMesh.mBody.color.setHex(col); aMesh.mAcc.color.setHex(acc); aMesh.livery.draw(name || 'Haastaja', num || 99, col, acc);
   aMesh.head.intensity = prev.head.intensity; aMesh.head.visible = prev.head.visible;
 }
+const DIRT = new THREE.Color(0x3a352e);
 const styleOf = nm => { let h = 0; for (const ch of nm) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 4; };
 
 function placeCar(c, m, dt) {
@@ -1992,6 +2150,19 @@ function placeCar(c, m, dt) {
   c.suspV += ((target - c.susp) * 110 - c.suspV * 10) * dt; c.susp = clamp(c.susp + c.suspV * dt, -0.32, 0.3);
   m.body.position.y = c.susp;
   m.cable.visible = c.state === 'crane';
+  if (m.mRed) {
+    // jarru- ja peruutusvalot, pakoputkien hehku turbon jälkeen, maali likaantuu vaurioista
+    const drive = c.state === 'drive'; if (!drive) m.body.rotation.set(0, 0, 0);
+    m.mRed.color.setHex(drive && c.brakeA > 0.1 && c.v > 0.5 ? 0xff3a24 : 0x7a1208);
+    m.mRev.color.setHex(drive && c.v < -0.5 ? 0xf4f6ff : 0x2a2a2a);
+    m.heat = c.boosting ? Math.min(1, m.heat + dt * 3) : Math.max(0, m.heat - dt * 0.6);
+    m.mTip.color.setRGB(0.16 + 0.35 * m.heat, 0.16 + 0.55 * m.heat, 0.19 + 0.81 * m.heat);
+    const dk = clamp(c.damage / 100, 0, 1) * 0.5; m.mBody.color.copy(m.baseCol).lerp(DIRT, dk); m.mBody.roughness = 0.26 + dk * 1.0;
+    // savu yli 60 %:n vaurioissa
+    m.smokeT -= dt;
+    if (c.damage > 60 && m.root.visible && m.smokeT <= 0 && c.state !== 'crane') { m.smokeT = c.damage > 85 ? 0.07 : 0.13; const p = m.smoke.find(q => q.userData.t >= 1.2); if (p) { p.position.set(0, 1.35, -1.25); m.root.localToWorld(p.position); p.userData.t = 0; p.visible = true; p.material.color.setHex(c.damage > 85 ? 0x2a2b2e : 0x6a6d72); } }
+    for (const p of m.smoke) { if (p.userData.t >= 1.2) { p.visible = false; continue; } p.userData.t += dt; const t = p.userData.t; p.position.y += dt * 1.6; p.scale.setScalar(0.4 + t * 1.3); p.material.opacity = 0.55 * (1 - t / 1.2); }
+  }
   if (c.state === 'drive') {
     // pehmennetty sivusijainti ja suunta: törmäysten pienet nykäykset eivät tärise ruudulla
     if (c.dVis === undefined || Math.abs(c.d - c.dVis) > 3) { c.dVis = c.d; c.psiVis = c.psi; }
@@ -2002,6 +2173,13 @@ function placeCar(c, m, dt) {
     m.root.rotation.set(-c.pitch, th, roll + clamp(c.steer * c.v * 0.0015, -0.05, 0.05));
     c.wheelRot += c.v * dt / 0.48;
     m.pivots.forEach(p => p.rotation.y = -c.steer * 0.38);
+    // korin kallistus kaarteissa ja nyökkäys jarrutuksessa/kiihdytyksessä (ei pelaajan ohjaamonäkymässä)
+    const acc = c.vPrev === undefined ? 0 : (c.v - c.vPrev) / Math.max(dt, 1e-3); c.vPrev = c.v;
+    m.accS += (clamp(acc, -40, 40) - m.accS) * Math.min(1, dt * 6);
+    const rollT = c.grounded ? clamp(-c.steer * c.v * 0.0017, -0.07, 0.07) : 0; m.roll += (rollT - m.roll) * Math.min(1, dt * 5);
+    const still = m === pMesh && camMode === 'cockpit';
+    m.body.rotation.set(still || !c.grounded ? 0 : clamp(-m.accS * 0.0035, -0.05, 0.05), 0, still ? 0 : m.roll);
+    m.helmet.rotation.z = m.roll * 2.2; m.helmet.position.y = 1.36 - c.susp * 0.3;
     if (m.steerWheel) {
       m.steerWheel.rotation.z = c.steer * 1.6;
       if (m.dashUI) m.dashUI.update(c, dt);
@@ -2064,7 +2242,7 @@ const fmt = t => { if (t == null || !isFinite(t)) return '–'; const m = Math.f
 function setupRace(idx) {
   trackIdx = idx; useTrack(getTrack(idx, curWidth())); applyWeather(track.weather);
   { const tn = $('trackName'); if (tn) { tn.textContent = TRACKS[idx].name; tn.title = TRACKS[idx].name; } } // radan nimi minikartan yläpuolelle
-  buildTrackMeshes(track, idx + 1);
+  buildTrackMeshes(track, idx + 1); applyToneFlags();
   player = newCar(false, track.L - 10, -3); ai = newCar(true, track.L - 10, 3); ai.lane = 2.5;
   raceTime = 0; finishOrder = []; resultShown = false; endTimer = 0;
   camPos.set(0, 0, 0); camInit = true;
@@ -2716,9 +2894,10 @@ function showResult() {
 }
 function startRace() {
   initAudio(); tryLandscape(); if (pMesh.dashUI) pMesh.dashUI.reset();
+  { const nm = typeof lbName === 'function' && LB_NAME_RE.test(lbName()) ? lbName() : 'Taivasrata'; if (pMesh.livery && pMesh.livName !== nm) { pMesh.livName = nm; pMesh.livery.draw(nm, 1, 0xd8262b, 0xffcc00); } }
   if (mode === 'champ' && champ) {
     trackIdx = champ.tracks[champ.round]; curOpp = drivers()[champ.opp[champ.round]]; aiTop = oppSkill(curOpp);
-    setAiCar(styleOf(curOpp.name), curOpp.color, curOpp.acc);
+    setAiCar(styleOf(curOpp.name), curOpp.color, curOpp.acc, curOpp.name, ALL_DRIVERS.findIndex(x => x.name === curOpp.name) + 2);
   } else { curOpp = null; aiTop = DIFFS[diffIdx].top; setAiCar(Math.floor(Math.random() * 4), 0x1f5fd6, 0xe9eef7); }
   $('champ').classList.add('hidden'); $('restartBtn').hidden = mode === 'champ';
   setupRace(trackIdx);
@@ -3371,9 +3550,22 @@ function buildMenu() {
 
 // ---------- Pääsilmukka ----------
 let last = performance.now(), acc = 0; const DT = 1 / 120;
+// dynaaminen resoluutio: jos ruudunpäivitys jää alle ~40 fps, renderöintitarkkuutta lasketaan portaittain; nostetaan takaisin kun on varaa
+const DPR_MAX = Math.min(window.devicePixelRatio || 1, 2), adapt = { pr: DPR_MAX, sum: 0, n: 0, t: 0, good: 0 };
+function adaptResolution(raw) {
+  if (gameState !== 'race' && gameState !== 'countdown') { adapt.sum = adapt.n = adapt.t = 0; return; }
+  if (raw > 0.25 || document.hidden) return; // välilehden vaihdot yms. eivät kerry
+  adapt.sum += raw; adapt.n++; adapt.t += raw; if (adapt.t < 2) return;
+  const avg = adapt.sum / adapt.n; adapt.sum = adapt.n = adapt.t = 0;
+  let pr = adapt.pr;
+  if (avg > 1 / 40 && pr > 1) { pr = Math.max(1, pr - 0.25); adapt.good = 0; }
+  else if (avg < 1 / 57 && pr < DPR_MAX && ++adapt.good >= 3) { pr = Math.min(DPR_MAX, pr + 0.25); adapt.good = 0; }
+  if (pr !== adapt.pr) { adapt.pr = pr; renderer.setPixelRatio(pr); resize(); }
+}
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = clamp((now - last) / 1000, 0, 0.05); last = now;
+  const raw = (now - last) / 1000, dt = clamp(raw, 0, 0.05); last = now;
+  adaptResolution(raw);
   pollGamepad(dt);
   if (gameState !== 'paused') updateBridges();
   if (gameState === 'menu' || gameState === 'champ') {
