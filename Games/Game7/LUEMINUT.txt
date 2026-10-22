@@ -1,0 +1,28 @@
+KYLVÄJÄT – julkaisuohje
+=======================
+
+Kansion sisältö
+- index.html          Peli
+- three.min.js        3D-kirjasto (three.js r128, MIT-lisenssi: three-LICENSE.txt)
+- fonts/              Fontit Barlow ja Big Shoulders Display (SIL OFL: fonts/OFL-LICENSE.txt)
+- favicon.svg         Selainvälilehden kuvake
+- thumbnail.png       Jakokuva (1200 x 630) somea varten
+- thumbnail-small.png Pienempi kuva pelivalikon korttiin (600 x 315)
+
+Julkaisu
+1. Kopioi koko kansio sivustollesi, esim. polkuun /pelit/kylvajat/
+2. Avaa https://oma-sivu.fi/pelit/kylvajat/ – mitään asennuksia tai palvelinkoodia ei tarvita.
+3. Peli ei hae mitään ulkopuolisilta palvelimilta (ei CDN:iä, ei Google Fontsia).
+
+Muokattavaa
+- "Takaisin kaikkiin peleihin" -linkki osoittaa kansiota ylemmäs (href="../").
+  Vaihda osoite index.html-tiedostossa, jos pelivalikkosi on muualla.
+- Jakokuva: some-palvelut vaativat täydellisen osoitteen. Vaihda index.html:ssä
+  <meta property="og:image" content="thumbnail.png"> muotoon
+  content="https://oma-sivu.fi/pelit/kylvajat/thumbnail.png".
+
+Huomioita
+- Peli toimii yleensä myös avaamalla index.html suoraan, mutta luotettavin tapa testata
+  omalla koneella on paikallinen palvelin: aja kansiossa python3 -m http.server
+  ja avaa http://localhost:8000
+- Ennätyspisteet tallentuvat pelaajan omaan selaimeen (localStorage), eivät palvelimelle.
