@@ -1420,11 +1420,11 @@ const hemi = new THREE.HemisphereLight(0xdcecff, 0x4d6b3a, 0.85); scene.add(hemi
 const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(300, 600, 200); scene.add(sun); scene.add(sun.target);
 // ---------- Aurinko ja varjot (kirkkaan sään radoilla) ----------
 if (renderer.shadowMap) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
-const SUN = { on: false, dir: new THREE.Vector3(0.45, 0.75, 0.48).normalize(), size: 80, pref: true, low: false }; // varjoalue 160 × 160 m
+const SUN = { on: false, dir: new THREE.Vector3(0.45, 0.75, 0.48).normalize(), ahead: 230, behind: 40, side: 65, pref: true, low: false }; // varjoalue: 230 m eteen, 40 m taakse, 65 m sivuille
 try { SUN.pref = localStorage.getItem('taivasrata-varjot') !== '0'; } catch (e) {}
 const isTouchDev = 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0;
 sun.shadow.mapSize.set(isTouchDev ? 2048 : 4096, isTouchDev ? 2048 : 4096);
-{ const sc = sun.shadow.camera; sc.left = -SUN.size; sc.right = SUN.size; sc.top = SUN.size; sc.bottom = -SUN.size; sc.near = 1; sc.far = 420; }
+{ const sc = sun.shadow.camera; sc.left = -SUN.side; sc.right = SUN.side; sc.top = SUN.ahead; sc.bottom = -SUN.behind; sc.near = 1; sc.far = 700; sc.updateProjectionMatrix(); }
 sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.05;
 // aurinkokiekko taivaalla (piirretään aina kaukana kameran takaa nähtynä auringon suunnassa)
 const sunSprite = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
@@ -1439,11 +1439,10 @@ function setSunForTrack(i, weather) {
   sun.castShadow = SUN.on; sunSprite.visible = weather === 'clear';
 }
 function updateSun() {
-  const p0 = player && pMesh.root.visible ? pMesh.root.position : camera.position;
-  // varjoalueen keskipiste siirretään katsesuuntaan: varjot ulottuvat pidemmälle eteenpäin
-  const fw0 = new THREE.Vector3(); camera.getWorldDirection(fw0); fw0.y = 0; if (fw0.lengthSq() > 1e-6) fw0.normalize();
-  const p = new THREE.Vector3().copy(p0).addScaledVector(fw0, SUN.size * 0.55);
-  sun.target.position.copy(p); sun.position.copy(p).addScaledVector(SUN.dir, 200); sun.target.updateMatrixWorld();
+  const p = player && pMesh.root.visible ? pMesh.root.position : camera.position;
+  // varjokameran "ylös" on katsesuunta: pitkä varjoalue ulottuu kauas eteen, lyhyt taakse
+  const fw0 = new THREE.Vector3(); camera.getWorldDirection(fw0); fw0.y = 0; if (fw0.lengthSq() > 1e-6) { fw0.normalize(); sun.shadow.camera.up.copy(fw0); }
+  sun.target.position.copy(p); sun.position.copy(p).addScaledVector(SUN.dir, 300); sun.target.updateMatrixWorld();
   if (sunSprite.visible) { sunSprite.position.copy(camera.position).addScaledVector(SUN.dir, 1800);
     const fw = new THREE.Vector3(); camera.getWorldDirection(fw); const k = Math.max(0, fw.dot(SUN.dir)); sunSprite.scale.setScalar(260 + Math.pow(k, 8) * 420); } // häikäisy kohti ajettaessa
 }
@@ -1805,7 +1804,7 @@ function mergeMeshes(meshes, parent) {
   return out;
 }
 // ---------- Ohjaamon mittaristo: kojelaudan ja ratin näytöt, vaihtovalot ja vaihdeläpät ----------
-function makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps) {
+function makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps, tmeter) {
   const X = dc.getContext('2d'), W = wc.getContext('2d');
   // hiilikuitukuvio kerran taustaksi
   const cf = document.createElement('canvas'); cf.width = cf.height = 16; const cx = cf.getContext('2d');
@@ -1853,7 +1852,7 @@ function makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps) {
     X.fillStyle = '#05140a'; X.fillRect(796, 168, 76, 62); X.fillStyle = '#58ff8a'; X.font = 'bold 54px monospace'; X.fillText(gear, 834, 220);
     // merkkivalot (3D-lamput kojelaudan päällä)
     const blink = Math.floor(st.t * 6) % 2 === 0;
-    const on = [c.boost > 20 || c.boosting, curWx.lights > 0, c.damage > 50 && (c.damage < 75 || blink), !c.grounded && blink];
+    const on = [c.damage > 50 && (c.damage < 75 || blink), !c.grounded && blink];
     lamps.forEach((l, k) => l.material.color.setHex(on[k] ? l.userData.col : 0x3a3c42));
     // halkeamat lasissa
     const nC = Math.floor(clamp((c.damage - 5) / 55, 0, 1) * cracks.length); // halkeamat alkavat jo 5 %:ssa ja ovat täynnä 60 %:ssa
@@ -1876,7 +1875,20 @@ function makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps) {
     if (lit >= 10) { W.fillStyle = blink ? '#3a7bff' : '#04070a'; W.fillRect(8, 8, 240, 10); }
     wtex.needsUpdate = true;
   }
-  let dKey = '', wKey = '';
+  let dKey = '', wKey = '', tKey = '';
+  // turbomittari: 12 palkkia, väri vaihtuu vähissä ja vilkkuu lähes tyhjänä; turbon aikana palkit hehkuvat sinisinä
+  function drawTurbo(c, blk) {
+    if (!tmeter) return; const T = tmeter.c.getContext('2d'), f = clamp(c.boost / 100, 0, 1), n = Math.round(f * 12);
+    T.fillStyle = '#05070b'; T.fillRect(0, 0, 256, 64); T.strokeStyle = '#2b3440'; T.lineWidth = 3; T.strokeRect(1.5, 1.5, 253, 61);
+    T.fillStyle = '#d6dbe3'; T.font = 'bold 30px monospace'; T.textAlign = 'left'; T.textBaseline = 'middle'; T.fillText('TURBO', 6, 33); // isompi ja vaaleampi teksti: luettava myös puhelimessa
+    const low = f < 0.25, crit = f < 0.12;
+    for (let k = 0; k < 12; k++) {
+      const lit = k < n && !(crit && !blk);
+      T.fillStyle = !lit ? '#1b2027' : c.boosting ? '#6fb4ff' : crit ? '#ff2a1a' : low ? '#ff8800' : (k < 8 ? '#2bd15a' : '#9cff6a');
+      T.fillRect(102 + k * 12.6, 14, 9.5, 36);
+    }
+    tmeter.t.needsUpdate = true;
+  }
   const COLS = [0x22e05a, 0x22e05a, 0x22e05a, 0xffd000, 0xffd000, 0xffd000, 0xff2a1a, 0xff2a1a, 0xff2a1a, 0xff2a1a];
   return {
     reset() { st.maxR = 0; st.gear = 0; },
@@ -1901,7 +1913,9 @@ function makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps) {
       if ((st.acc = (st.acc || 0) + dt) >= 0.05) {
         st.acc = 0; const blk = Math.floor(st.t * 6) % 2 === 0;
         // piirretään uudelleen vain, jos näkyvä arvo muuttui (tekstuurin siirto näytönohjaimelle on kallein vaihe)
-        const k1 = Math.round(Math.abs(c.v) * 1.8) + '|' + Math.round(rpm * 20) + '|' + gear + '|' + Math.round(st.maxR * 20) + '|' + Math.floor(clamp((c.damage - 5) / 55, 0, 1) * 16) + '|' + (c.boost > 20 || c.boosting) + (curWx.lights > 0) + (c.damage > 50 && (c.damage < 75 || blk)) + (!c.grounded && blk);
+        const k1 = Math.round(Math.abs(c.v) * 1.8) + '|' + Math.round(rpm * 20) + '|' + gear + '|' + Math.round(st.maxR * 20) + '|' + Math.floor(clamp((c.damage - 5) / 55, 0, 1) * 16) + '|' + (c.damage > 50 && (c.damage < 75 || blk)) + (!c.grounded && blk);
+        const k3 = Math.round(clamp(c.boost / 100, 0, 1) * 12) + '|' + !!c.boosting + '|' + (c.boost < 12 && blk);
+        if (k3 !== tKey) { tKey = k3; drawTurbo(c, blk); }
         if (k1 !== dKey) { dKey = k1; draw(c, rpm, gear, c.v * 3.6, lit); }
         const k2 = kmhText(c.v) + '|' + gear + '|' + Math.ceil(c.boost / 12.5) + '|' + (lit >= 10 && blk);
         if (k2 !== wKey) { wKey = k2; drawWheel(c, gear, lit, blk); }
@@ -2134,14 +2148,20 @@ function makeCar(color, accent, withCockpit, style) {
     for (const sx of [-1, 1]) { const pg = new THREE.Group(); pg.position.set(-sx * 0.12, 0.02, 0.03); const p = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.11, 0.008), mCarbon2); p.position.x = -sx * 0.03; pg.add(p); steerWheel.add(pg); paddles.push(pg); } // [vasen = alas, oikea = ylös]
     // merkkivalot kojelaudan päällä ratin molemmin puolin: TURBO, VALOT | RUNKO, ILMA
     const lamps = [];
-    [['TURBO', 0x2bd15a, 0.37], ['VALOT', 0x3a7bff, 0.28], ['RUNKO', 0xff2a1a, -0.28], ['ILMA', 0xffb000, -0.37]].forEach(([txt, col, x]) => {
+    // vasemmalla turbomittari (paljonko turboa on jäljellä), oikealla merkkivalot RUNKO ja ILMA
+    const tmc = document.createElement('canvas'); tmc.width = 256; tmc.height = 64; const tmt = new THREE.CanvasTexture(tmc);
+    const tmm = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.05), new THREE.MeshBasicMaterial({ map: tmt, toneMapped: false }));
+    tmm.rotation.set(0.2, Math.PI, 0); tmm.position.set(0.325, 1.116, 0.65); body.add(tmm); // kehyksen etupuolella, ettei yläreuna jää piiloon
+    add(new THREE.BoxGeometry(0.212, 0.062, 0.014), mTrim, 0.325, 1.114, 0.668).rotation.x = -0.2; // kehys
+    const tmeter = { c: tmc, t: tmt };
+    [['RUNKO', 0xff2a1a, -0.28], ['ILMA', 0xffb000, -0.37]].forEach(([txt, col, x]) => {
       const lc = document.createElement('canvas'); lc.width = 128; lc.height = 48; const lx = lc.getContext('2d');
       lx.fillStyle = '#ffffff'; lx.fillRect(0, 0, 128, 48); lx.fillStyle = '#000000'; lx.font = 'bold 26px monospace'; lx.textAlign = 'center'; lx.fillText(txt, 64, 34);
       const l = new THREE.Mesh(new THREE.PlaneGeometry(0.085, 0.032), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(lc), color: 0x3a3c42, toneMapped: false }));
-      l.userData.col = col; l.rotation.set(0.2, Math.PI, 0); l.position.set(x, 1.112, 0.66); body.add(l); lamps.push(l);
+      l.userData.col = col; l.rotation.set(0.2, Math.PI, 0); l.position.set(x, 1.112, 0.65); body.add(l); lamps.push(l);
       add(new THREE.BoxGeometry(0.097, 0.044, 0.014), mTrim, x, 1.11, 0.668).rotation.x = -0.2; // kehys
     });
-    dashUI = makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps);
+    dashUI = makeDashUI(dc, dtex, wc, wtex, leds, paddles, lamps, tmeter);
     // vaihdekeppi
     const lever = add(new THREE.CylinderGeometry(0.012, 0.012, 0.26, 6), mMetal, 0.3, 1.0, 0.1); lever.rotation.x = 0.25;
     add(new THREE.SphereGeometry(0.035, 10, 8), mGrip, 0.3, 1.13, 0.13);
