@@ -1479,8 +1479,8 @@ function applyShadowMode() {
   const sc = sun.shadow.camera, koko = SUN.mode === 'koko';
   // tarkka kartta: koko radan tilassa pieni alue auton ympärillä (autojen varjot), lähialuetilassa iso alue kuten ennen
   const A = koko ? { side: 30, ahead: 70, behind: 20 } : { side: SUN.side, ahead: SUN.ahead, behind: SUN.behind };
-  sc.left = -A.side; sc.right = A.side; sc.top = A.ahead; sc.bottom = -A.behind; sc.near = 60; sc.far = 520; sc.updateProjectionMatrix(); // tiivis syvyysalue = tarkka vertailu
-  const s = koko ? (isTouchDev ? 1024 : 2048) : (isTouchDev ? 2048 : 4096);
+  if (!koko) { sc.left = -A.side; sc.right = A.side; sc.top = A.ahead; sc.bottom = -A.behind; sc.near = 60; sc.far = 520; sc.updateProjectionMatrix(); } // lähialue; koko radan tilassa fitNearToCars rajaa joka ruudulla
+  const s = koko ? (isTouchDev ? 1024 : 4096) : (isTouchDev ? 2048 : 4096); // tietokoneella autojen kartta 4096 px, puhelimessa 1024 px
   if (sun.shadow.mapSize.x !== s) { sun.shadow.mapSize.set(s, s); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
   sunFar.castShadow = koko && SUN.on;
   if (sunFar.castShadow) { fitSunToTrack(track); sunFar.target.position.copy(SUN.fit.c); sunFar.position.copy(SUN.fit.c).addScaledVector(SUN.dir, SUN.fit.D);
@@ -1493,11 +1493,34 @@ function farShadowTick(dt) {
   SUN.farT = (SUN.farT || 0) - dt;
   if (SUN.farT <= 0) { SUN.farT = track.bridges && track.bridges.length ? 0.5 : 1e9; setCarCasting(false); sunFar.shadow.needsUpdate = true; sun.shadow.autoUpdate = false; sun.shadow.needsUpdate = false; SUN.farPending = true; }
 }
+// Koko radan tilassa tarkka kartta rajataan joka ruudulla tiukasti autojen ympärille (valon koordinaatistossa).
+// Koko valitaan portaittain ja keskipiste lukitaan kartan pikseliruudukkoon: varjon reunat eivät väreile liikkeessä.
+const NEAR_SIZES = [16, 20, 25, 32, 40, 50, 64, 80], _ex = new THREE.Vector3(), _ey = new THREE.Vector3();
+function fitNearToCars() {
+  const d = SUN.dir; _ex.set(0, 1, 0).cross(d).normalize(); _ey.copy(d).cross(_ex);
+  const pts = [pMesh.root.position], aiIn = aMesh.root.visible && ai && aMesh.root.position.distanceTo(pMesh.root.position) < 70;
+  if (aiIn) pts.push(aMesh.root.position);
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, zc = 0;
+  for (const p of pts) { const a = p.dot(_ex), b = p.dot(_ey); x0 = Math.min(x0, a); x1 = Math.max(x1, a); y0 = Math.min(y0, b); y1 = Math.max(y1, b); zc += p.dot(d) / pts.length; }
+  const m = 3.2 + 2.2 / Math.max(0.3, d.y);                                   // auton puolipituus + varjon pituus auringon kulmasta
+  const need = Math.max(x1 - x0, y1 - y0) + 2 * m, side = NEAR_SIZES.find(v => v >= need) || 80, half = side / 2;
+  const texel = side / sun.shadow.mapSize.x;
+  const cx = Math.round(((x0 + x1) / 2) / texel) * texel, cy = Math.round(((y0 + y1) / 2) / texel) * texel; // pikseliruudukkoon lukitus
+  const sc = sun.shadow.camera; sc.up.set(0, 1, 0);
+  if (sc.right !== half || sc.near !== 160) { sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 160; sc.far = 240; sc.updateProjectionMatrix(); }
+  const c = new THREE.Vector3().addScaledVector(_ex, cx).addScaledVector(_ey, cy).addScaledVector(d, zc);
+  sun.target.position.copy(c); sun.position.copy(c).addScaledVector(d, 200); sun.target.updateMatrixWorld();
+  SUN.aiCovered = aiIn;
+}
 function updateSun() {
+  if (SUN.on && SUN.mode === 'koko' && player) { fitNearToCars(); return updateSunSprite(); }
   const p = player && pMesh.root.visible ? pMesh.root.position : camera.position;
   // varjokameran "ylös" on katsesuunta: pitkä varjoalue ulottuu kauas eteen, lyhyt taakse
   const fw0 = new THREE.Vector3(); camera.getWorldDirection(fw0); fw0.y = 0; if (fw0.lengthSq() > 1e-6) { fw0.normalize(); sun.shadow.camera.up.copy(fw0); }
   sun.target.position.copy(p); sun.position.copy(p).addScaledVector(SUN.dir, 300); sun.target.updateMatrixWorld();
+  updateSunSprite();
+}
+function updateSunSprite() {
   if (sunSprite.visible) { sunSprite.position.copy(camera.position).addScaledVector(SUN.dir, 1800);
     const fw = new THREE.Vector3(); camera.getWorldDirection(fw); const k = Math.max(0, fw.dot(SUN.dir)); sunSprite.scale.setScalar(260 + Math.pow(k, 8) * 420); } // häikäisy kohti ajettaessa
 }
@@ -2276,7 +2299,7 @@ function setAiCar(st, col, acc, name, num) {
 }
 const DIRT = new THREE.Color(0x3a352e);
 // auringon varjojen kanssa auton alle jää himmeä, tiivis kosketusvarjo (painaa auton rataan kiinni)
-function contactShadows() { for (const m of [pMesh, aMesh]) { if (!m.shadow.visible) continue; m.shadow.material.opacity *= 0.5; m.shadow.scale.set(0.82, 1, 0.86); } }
+function contactShadows() { for (const m of [pMesh, aMesh]) { if (!m.shadow.visible) continue; if (m === aMesh && SUN.mode === 'koko' && !SUN.aiCovered) continue; m.shadow.material.opacity *= 0.5; m.shadow.scale.set(0.82, 1, 0.86); } } // kaukana oleva vastustaja: täysi alusvarjo
 const styleOf = nm => { let h = 0; for (const ch of nm) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 4; };
 
 function placeCar(c, m, dt) {
