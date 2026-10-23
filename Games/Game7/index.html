@@ -80,9 +80,12 @@ button:focus-visible,input:focus-visible+span{outline:2px solid var(--fuel);outl
 
 /* screens */
 .screen{position:fixed;inset:0;display:flex;overflow:auto;touch-action:pan-y}
-#title{align-items:center;background:linear-gradient(90deg,rgba(9,22,28,.86) 0%,rgba(9,22,28,.6) 46%,rgba(9,22,28,0) 78%)}
-.titlewrap{max-width:600px;padding:clamp(24px,6vw,80px)}
-h1{font-family:"Big Shoulders Display",Impact,sans-serif;font-weight:900;font-size:clamp(84px,16vw,208px);line-height:.8;margin:0 0 22px;letter-spacing:-.01em;
+#title{align-items:center;background:linear-gradient(90deg,rgba(9,22,28,.88) 0%,rgba(9,22,28,.72) 40%,rgba(9,22,28,.35) 62%,rgba(9,22,28,0) 85%)}
+.titlewrap{width:100%;max-width:680px;padding:clamp(24px,6vw,80px);container-type:inline-size}
+h1{font-family:"Big Shoulders Display",Impact,sans-serif;font-weight:900;line-height:.82;margin:0 0 22px;letter-spacing:-.01em;
+  font-size:min(208px,13vw,24vh);font-size:min(208px,30cqi,24vh);
+  width:max-content;max-width:100%;white-space:nowrap;padding:.04em .02em .02em 0;
+  filter:drop-shadow(0 2px 16px rgba(9,22,28,.55));
   color:var(--text);
   background:radial-gradient(circle at 83% 22%,var(--virus) 0 7%,transparent 7.5%),radial-gradient(circle at 91% 60%,var(--virus) 0 4%,transparent 4.5%),radial-gradient(circle at 70% 88%,var(--virus) 0 5%,transparent 5.5%),radial-gradient(circle at 96% 92%,var(--virus) 0 9%,transparent 9.5%),linear-gradient(var(--text),var(--text));
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
