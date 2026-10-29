@@ -277,6 +277,24 @@ body.touch.sup #crew,body.touch.sup #hint,body.touch.sup #warn{visibility:hidden
   body.touch #crew{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 156px);max-width:84vw;font-size:13px}
   body.touch.crewon #hint{visibility:hidden}
 }
+/* mobile action buttons beside the minimap, top right (fire stays at the right edge); weapon button only when rockets exist */
+body.touch #bPause,body.touch #bGear,body.touch #bWinch,body.touch #bWpn{width:46px;height:46px;bottom:auto;left:auto;transform:none;font-size:11px}
+body.norockets #bWpn{display:none}
+@media (orientation:landscape){
+  body.touch #bPause{right:136px;top:calc(env(safe-area-inset-top,0px) + 8px)}body.touch #bGear{right:188px;top:calc(env(safe-area-inset-top,0px) + 8px)}
+  body.touch #bWinch{right:136px;top:calc(env(safe-area-inset-top,0px) + 60px)}body.touch #bWpn{right:188px;top:calc(env(safe-area-inset-top,0px) + 60px)}
+  body.touch #radio{left:200px;right:244px;transform:none;width:auto}
+  body.touch #objs{max-width:180px}
+}
+@media (orientation:portrait){
+  body.touch #bPause{right:136px;top:calc(env(safe-area-inset-top,0px) + 8px)}body.touch #bGear{right:136px;top:calc(env(safe-area-inset-top,0px) + 60px)}
+  body.touch #bWinch{right:136px;top:calc(env(safe-area-inset-top,0px) + 112px)}body.touch #bWpn{right:136px;top:calc(env(safe-area-inset-top,0px) + 164px)}
+  body.touch #radio{top:calc(env(safe-area-inset-top,0px) + 218px)}body.touch.norockets #radio{top:calc(env(safe-area-inset-top,0px) + 166px)}
+  body.touch #warn{max-width:120px}
+  body.touch #objs{max-width:min(46vw,184px)}
+  body.touch #crew{left:8px;right:110px;transform:none;max-width:none;width:auto}
+  body.touch #hint{left:8px;right:110px;transform:none;max-width:none;bottom:calc(env(safe-area-inset-bottom,0px) + 40% + 8px)}
+}
 </style>
 </head>
 <body>
@@ -516,7 +534,7 @@ function updateWater(dt){
 }
 /* ================= TIME OF DAY ================= */
 // Sun from a simple solar model: latitude 60° N, midsummer-ish declination; game time runs 20× real time.
-let NIGHT=0;const MOONDIR=new THREE.Vector3(.3,.75,.6).normalize(),SUNDIR=new THREE.Vector3(),SUNTMP=new THREE.Vector3(),SKYC=new THREE.Color(),CTMP=new THREE.Color();
+let NIGHT=0,LIGHTNEED=0;const MOONDIR=new THREE.Vector3(.3,.75,.6).normalize(),SUNDIR=new THREE.Vector3(),SUNTMP=new THREE.Vector3(),SKYC=new THREE.Color(),CTMP=new THREE.Color();
 const fmtClock=h=>{h=((h%24)+24)%24;const H=Math.floor(h),M=Math.floor((h-H)*60);return String(H).padStart(2,'0')+':'+String(M).padStart(2,'0');};
 function shadowify(o){o.traverse(n=>{if(n.isMesh&&n.material&&!n.material.isMeshBasicMaterial){n.castShadow=true;n.receiveShadow=true;}});}
 function updateSun(){
@@ -525,7 +543,7 @@ function updateSun(){
   const e=Math.asin(Math.sin(phi)*Math.sin(dec)+Math.cos(phi)*Math.cos(dec)*Math.cos(Hh));
   const A=Math.atan2(Math.sin(Hh),Math.cos(Hh)*Math.sin(phi)-Math.tan(dec)*Math.cos(phi))+Math.PI;
   const ce=Math.cos(e);SUNDIR.set(Math.sin(A)*ce,Math.sin(e),-Math.cos(A)*ce);
-  const ed=e/DEG,day=smooth(ed/12),low=1-smooth((ed-3)/22),night=1-smooth((ed+7)/7);NIGHT=night;
+  const ed=e/DEG,day=smooth(ed/12),low=1-smooth((ed-3)/22),night=1-smooth((ed+7)/7);NIGHT=night;LIGHTNEED=1-smooth((ed-2)/10);// lights on from ~12° sun elevation downward (dusk, dawn, night)
   SUN.intensity=.92*day;SUN.color.setHex(0xfff2dc).lerp(CTMP.setHex(0xffa25a),low*day);
   HEMI.intensity=.28+.5*smooth((ed+6)/18)+.14*night;HEMI.color.setHex(0xe2e8ea).lerp(CTMP.setHex(0x8fa3c8),night);
   SUN.intensity=.92*day+.3*night+.24*(1-day)*(1-night);if(night>.5)SUN.color.setHex(0xa9bde6);else if(day<.25)SUN.color.setHex(0xd9b4a0);HEMI.intensity+=.06*(1-day);
@@ -755,7 +773,7 @@ function addHouse(x,z,o){const y=getH(x,z);const g=houseMesh(o);g.scale.setScala
 function addBuilding(x,z,w,d,h,color,roof=0x3a3a38){return addHouse(x,z,{w,d,h,body:color,roof,chimney:true});}
 
 /* ================= HELICOPTER ================= */
-let heliLight=null,heliObj,rotor,tailRotor,gearL,gearR,shadow,rope,hookMesh,strobe,rotorDisc;
+let heliLight=null,heliFill=null,heliObj,rotor,tailRotor,gearL,gearR,shadow,rope,hookMesh,strobe,rotorDisc;
 // Lofted body with UVs (u around the section starting at the belly, v along the length) so a detail texture can be applied.
 function loft(keys,M,colorFn,step=.3,tex=null){
   const secs=[];for(let k=0;k<keys.length-1;k++){const a=keys[k],b=keys[k+1];const n=Math.max(1,Math.round((b[0]-a[0])/step));
@@ -880,6 +898,7 @@ function buildHeli(){
   rope=new THREE.Line(lg,new THREE.LineBasicMaterial({color:0x111111}));rope.frustumCulled=false;scene.add(rope);rope.visible=false;
   hookMesh=new THREE.Group();mk(.5,.6,.5,0x2a2a2a,0,0,0,hookMesh);mk(.15,.5,.15,0xd9b13a,0,-.5,0,hookMesh);scene.add(hookMesh);hookMesh.visible=false;buildDownwash();
   heliLight=new THREE.SpotLight(0xfff1d6,0,180,.45,.55,1.1);scene.add(heliLight);scene.add(heliLight.target);
+  heliFill=new THREE.PointLight(0xffe2b8,0,70,1.6);scene.add(heliFill);
 }
 const heli={pos:new V3(),vel:new V3(),yaw:0,pitch:0,roll:0,T:1,gear:true,gearPos:1,landed:true,site:null,pilotLanded:false,fuel:100,armour:100,alive:true,passengers:[],hook:null,weapon:0,fireCool:0,smokeT:0,boardCool:0};
 const ammo={cannon:0,rockets:0};let caps={cannon:0,rockets:0};
@@ -1559,7 +1578,7 @@ function prepareMission(i,mode){
      services:new Set(['sisu']),signals:{},radio:[],ended:false,winT:-1,data:{},helis:3,credits:def.budget,respawnT:-1,swapT:0,unloadCool:0,pending:[]};
   PROJ.length=0;FX.length=0;
   if(!heliObj)buildHeli();if(!SIG.pts)buildSignals();for(let i=0;i<SIG.n;i++)SIG.life[i]=0;
-  caps=Object.assign({},def.cap);ammo.cannon=def.load.cannon;ammo.rockets=def.load.rockets;heli.weapon=0;
+  caps=Object.assign({},def.cap);document.body.classList.toggle('norockets',!def.cap.rockets);ammo.cannon=def.load.cannon;ammo.rockets=def.load.rockets;heli.weapon=0;
   def.setup();
   const excl=[[SISU.x,SISU.z,60]];for(const f of MAPDEF.flats)excl.push([f.x,f.z,f.r+14]);
   for(const u of R.units)excl.push([u.pos.x,u.pos.z,22]);for(const g of Object.values(R.groups))for(const m of g.members)excl.push([m.pos.x,m.pos.z,16]);
@@ -1957,7 +1976,7 @@ function updateHeliVisual(dt){
   heliObj.position.copy(heli.pos);heliObj.rotation.set(-heli.pitch,-heli.yaw,-heli.roll);
   rotor.rotation.y+=dt*(heli.landed&&heli.T<.8?8:30);tailRotor.rotation.x+=dt*40;
   if(strobe)strobe.visible=(clock%1.2)<.09;
-  if(heliLight){heliLight.intensity=heli.alive?2.6*smooth((NIGHT-.2)/.5):0;heliLight.position.set(heli.pos.x+Math.sin(heli.yaw)*4,heli.pos.y-1.5,heli.pos.z-Math.cos(heli.yaw)*4);
+  if(heliLight){heliLight.intensity=heli.alive?2.8*LIGHTNEED:0;if(heliFill){heliFill.intensity=heli.alive?1.1*LIGHTNEED:0;heliFill.position.set(heli.pos.x,heli.pos.y+5,heli.pos.z);}heliLight.position.set(heli.pos.x+Math.sin(heli.yaw)*4,heli.pos.y-1.5,heli.pos.z-Math.cos(heli.yaw)*4);
     heliLight.target.position.set(heli.pos.x+Math.sin(heli.yaw)*22,heli.pos.y-30,heli.pos.z-Math.cos(heli.yaw)*22);heliLight.target.updateMatrixWorld();}if(rotorDisc)rotorDisc.material.opacity=heli.landed&&heli.T<.8?.04:.12;
   {const gp=heli.gearPos;gearL.visible=gp>.02;gearL.position.y=(1-gp)*1.3;gearL.rotation.x=-(1-gp)*.35;}
   if(heli.alive){const g=groundAt(heli.pos.x,heli.pos.z);const alt=heli.pos.y-g.h;shadow.visible=false;shadow.position.set(heli.pos.x,g.h+.2,heli.pos.z);
@@ -1995,7 +2014,7 @@ function renderCrew(){const el=$('#crew'),m=R.radio.filter(x=>x.grp==='crew').sl
   renderCrew.t=setTimeout(()=>{el.style.opacity=0;document.body.classList.remove('crewon');},readTime(m.txt));}
 // phones in portrait: Eeva's subtitle sits directly under the radio box so the two never overlap
 function layoutCrew(){const c=$('#crew');if(!touchOn||innerWidth>innerHeight){c.style.top='';return;}
-  const r=$('#radio'),vis=r.children.length&&r.style.opacity!=='0';c.style.top=((vis?r.getBoundingClientRect().bottom:150)+6)+'px';}
+  const r=$('#radio'),vis=r.children.length&&r.style.opacity!=='0';c.style.top=((vis?r.getBoundingClientRect().bottom:[...document.querySelectorAll('#bWinch,#bWpn')].filter(e=>e.offsetParent).reduce((m,e)=>Math.max(m,e.getBoundingClientRect().bottom),150))+6)+'px';}
 addEventListener('resize',()=>{if(R&&touchOn)layoutCrew();});
 function renderObjs(){renderObjs0();const el=$('#objs');if(el.classList.contains('open'))return;
   const vis=R.objs.filter(o=>!o.hidden),prim=vis.filter(o=>o.primary),cur=prim.find(o=>o.state==='active');
